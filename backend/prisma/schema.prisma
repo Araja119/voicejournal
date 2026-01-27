@@ -1,0 +1,200 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String   @id @default(uuid())
+  email           String   @unique
+  passwordHash    String   @map("password_hash")
+  phoneNumber     String?  @map("phone_number")
+  displayName     String   @map("display_name")
+  profilePhotoUrl String?  @map("profile_photo_url")
+  subscriptionTier String  @default("free") @map("subscription_tier")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  journals             Journal[]
+  people               Person[]
+  notifications        Notification[]
+  pushTokens           PushToken[]
+  journalCollaborations JournalCollaborator[]
+  refreshTokens        RefreshToken[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String   @map("user_id")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+model Journal {
+  id             String   @id @default(uuid())
+  ownerId        String   @map("owner_id")
+  title          String
+  description    String?
+  coverImageUrl  String?  @map("cover_image_url")
+  privacySetting String   @default("private") @map("privacy_setting")
+  shareCode      String?  @unique @map("share_code")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  owner         User                  @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  collaborators JournalCollaborator[]
+  questions     Question[]
+
+  @@index([ownerId])
+  @@map("journals")
+}
+
+model JournalCollaborator {
+  id              String    @id @default(uuid())
+  journalId       String    @map("journal_id")
+  userId          String?   @map("user_id")
+  email           String?
+  phoneNumber     String?   @map("phone_number")
+  permissionLevel String    @default("view") @map("permission_level")
+  invitedAt       DateTime  @default(now()) @map("invited_at")
+  acceptedAt      DateTime? @map("accepted_at")
+
+  journal Journal @relation(fields: [journalId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("journal_collaborators")
+}
+
+model Person {
+  id              String   @id @default(uuid())
+  ownerId         String   @map("owner_id")
+  name            String
+  relationship    String
+  email           String?
+  phoneNumber     String?  @map("phone_number")
+  profilePhotoUrl String?  @map("profile_photo_url")
+  linkedUserId    String?  @map("linked_user_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  owner       User                  @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  assignments QuestionAssignment[]
+  recordings  Recording[]
+
+  @@index([ownerId])
+  @@map("people")
+}
+
+model QuestionTemplate {
+  id               String  @id @default(uuid())
+  relationshipType String  @map("relationship_type")
+  questionText     String  @map("question_text")
+  category         String?
+  displayOrder     Int     @default(0) @map("display_order")
+  isActive         Boolean @default(true) @map("is_active")
+
+  questions Question[]
+
+  @@index([relationshipType])
+  @@map("question_templates")
+}
+
+model Question {
+  id           String   @id @default(uuid())
+  journalId    String   @map("journal_id")
+  questionText String   @map("question_text")
+  source       String   @default("custom")
+  templateId   String?  @map("template_id")
+  displayOrder Int      @default(0) @map("display_order")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  journal     Journal             @relation(fields: [journalId], references: [id], onDelete: Cascade)
+  template    QuestionTemplate?   @relation(fields: [templateId], references: [id])
+  assignments QuestionAssignment[]
+
+  @@index([journalId])
+  @@map("questions")
+}
+
+model QuestionAssignment {
+  id              String    @id @default(uuid())
+  questionId      String    @map("question_id")
+  personId        String    @map("person_id")
+  status          String    @default("pending")
+  uniqueLinkToken String    @unique @map("unique_link_token")
+  sentAt          DateTime? @map("sent_at")
+  viewedAt        DateTime? @map("viewed_at")
+  answeredAt      DateTime? @map("answered_at")
+  reminderCount   Int       @default(0) @map("reminder_count")
+  lastReminderAt  DateTime? @map("last_reminder_at")
+
+  question   Question    @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  person     Person      @relation(fields: [personId], references: [id], onDelete: Cascade)
+  recordings Recording[]
+  notifications Notification[]
+
+  @@index([questionId])
+  @@index([personId])
+  @@index([uniqueLinkToken])
+  @@map("question_assignments")
+}
+
+model Recording {
+  id            String    @id @default(uuid())
+  assignmentId  String    @map("assignment_id")
+  personId      String?   @map("person_id")
+  audioFileUrl  String    @map("audio_file_url")
+  durationSeconds Int?    @map("duration_seconds")
+  fileSizeBytes BigInt?   @map("file_size_bytes")
+  transcription String?
+  recordedAt    DateTime? @map("recorded_at")
+  uploadedAt    DateTime  @default(now()) @map("uploaded_at")
+
+  assignment   QuestionAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  person       Person?            @relation(fields: [personId], references: [id])
+  notifications Notification[]
+
+  @@index([assignmentId])
+  @@map("recordings")
+}
+
+model Notification {
+  id                  String    @id @default(uuid())
+  recipientUserId     String    @map("recipient_user_id")
+  notificationType    String    @map("notification_type")
+  channel             String?
+  title               String?
+  body                String?
+  relatedAssignmentId String?   @map("related_assignment_id")
+  relatedRecordingId  String?   @map("related_recording_id")
+  sentAt              DateTime  @default(now()) @map("sent_at")
+  readAt              DateTime? @map("read_at")
+
+  recipientUser     User                @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
+  relatedAssignment QuestionAssignment? @relation(fields: [relatedAssignmentId], references: [id])
+  relatedRecording  Recording?          @relation(fields: [relatedRecordingId], references: [id])
+
+  @@index([recipientUserId])
+  @@map("notifications")
+}
+
+model PushToken {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  token     String
+  platform  String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("push_tokens")
+}
