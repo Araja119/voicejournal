@@ -8,8 +8,7 @@ struct LaunchView: View {
         let colors = AppColors(colorScheme)
 
         ZStack {
-            colors.background
-                .ignoresSafeArea()
+            AppBackground()
 
             VStack(spacing: Theme.Spacing.lg) {
                 // App Icon / Logo

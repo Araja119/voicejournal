@@ -12,8 +12,7 @@ struct OnboardingView: View {
 
         NavigationStack {
             ZStack {
-                colors.background
-                    .ignoresSafeArea()
+                AppBackground()
 
                 VStack(spacing: Theme.Spacing.xl) {
                     Spacer()

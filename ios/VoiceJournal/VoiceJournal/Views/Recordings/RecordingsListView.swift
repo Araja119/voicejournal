@@ -10,8 +10,7 @@ struct RecordingsListView: View {
 
         NavigationStack {
             ZStack {
-                colors.background
-                    .ignoresSafeArea()
+                AppBackground()
 
                 if viewModel.isLoading {
                     LoadingView()

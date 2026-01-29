@@ -29,7 +29,7 @@ struct JournalDetailView: View {
         let colors = AppColors(colorScheme)
 
         ZStack {
-            colors.background
+            AppBackground()
                 .ignoresSafeArea()
 
             if viewModel.isLoading {

@@ -18,8 +18,7 @@ struct HubView: View {
 
         NavigationStack {
             ZStack {
-                colors.background
-                    .ignoresSafeArea()
+                AppBackground()
 
                 VStack(spacing: 0) {
                     // Top Bar
@@ -57,6 +56,7 @@ struct HubView: View {
             .sheet(isPresented: $showingSettings) {
                 SettingsView()
                     .environmentObject(appState)
+                    .preferredColorScheme(appState.colorScheme)
             }
             .sheet(isPresented: $showingNewJournal, onDismiss: {
                 // Navigate after sheet dismisses
@@ -120,11 +120,13 @@ struct HubView: View {
         VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
             Text("Welcome back,")
                 .font(AppTypography.bodyLarge)
-                .foregroundColor(colors.textSecondary)
+                .foregroundColor(colors.textPrimary.opacity(0.8))
+                .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
 
             Text(appState.currentUser?.displayName ?? "Friend")
                 .font(AppTypography.displayMedium)
                 .foregroundColor(colors.textPrimary)
+                .shadow(color: .black.opacity(0.4), radius: 3, x: 0, y: 1)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.top, Theme.Spacing.sm)

@@ -40,8 +40,8 @@ extension Color {
         /// Coral Orange - Primary accent (#FF735A)
         static let accentPrimary = Color(hex: "FF735A")
 
-        /// Warm Peach - Secondary accent (#FFD7AE)
-        static let accentSecondary = Color(hex: "FFD7AE")
+        /// Amber - Secondary accent (#C47F17)
+        static let accentSecondary = Color(hex: "C47F17")
     }
 }
 

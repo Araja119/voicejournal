@@ -17,8 +17,7 @@ struct LoginView: View {
 
         NavigationStack {
             ZStack {
-                colors.background
-                    .ignoresSafeArea()
+                AppBackground()
 
                 ScrollView {
                     VStack(spacing: Theme.Spacing.xl) {

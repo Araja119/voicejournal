@@ -12,8 +12,7 @@ struct PeopleListView: View {
 
         NavigationStack {
             ZStack {
-                colors.background
-                    .ignoresSafeArea()
+                AppBackground()
 
                 if viewModel.isLoading {
                     LoadingView()

@@ -16,8 +16,7 @@ struct JournalsListView: View {
 
         NavigationStack(path: $navigationPath) {
             ZStack {
-                colors.background
-                    .ignoresSafeArea()
+                AppBackground()
 
                 if viewModel.isLoading {
                     LoadingView()

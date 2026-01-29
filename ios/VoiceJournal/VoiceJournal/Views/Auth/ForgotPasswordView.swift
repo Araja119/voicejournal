@@ -10,8 +10,7 @@ struct ForgotPasswordView: View {
 
         NavigationStack {
             ZStack {
-                colors.background
-                    .ignoresSafeArea()
+                AppBackground()
 
                 VStack(spacing: Theme.Spacing.xl) {
                     // Header
