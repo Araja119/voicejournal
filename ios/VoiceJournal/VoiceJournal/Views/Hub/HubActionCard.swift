@@ -1,37 +1,61 @@
 import SwiftUI
 
+enum CardProminence {
+    case primary   // The ONE action - larger, more elevated
+    case standard  // Normal action cards
+}
+
 struct HubActionCard: View {
     let title: String
     let subtitle: String
     let icon: String
     let accentColor: Color
     let colors: AppColors
+    var prominence: CardProminence = .standard
     let action: () -> Void
 
+    @Environment(\.colorScheme) var colorScheme
     @State private var isPressed = false
+
+    // Size adjustments based on prominence
+    private var iconSize: CGFloat {
+        prominence == .primary ? 64 : 52
+    }
+
+    private var iconFontSize: CGFloat {
+        prominence == .primary ? 28 : 22
+    }
+
+    private var verticalPadding: CGFloat {
+        prominence == .primary ? Theme.Spacing.xl : Theme.Spacing.lg
+    }
+
+    private var cardOpacity: Double {
+        // Slightly more transparent in dark mode per feedback
+        colorScheme == .dark ? 0.92 : 1.0
+    }
 
     var body: some View {
         Button(action: {
-            // Haptic feedback
             let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
             impactFeedback.impactOccurred()
             action()
         }) {
             HStack(spacing: Theme.Spacing.md) {
-                // Icon
+                // Icon - larger and more vibrant for primary
                 Circle()
-                    .fill(accentColor.opacity(0.15))
-                    .frame(width: 56, height: 56)
+                    .fill(accentColor.opacity(prominence == .primary ? 0.2 : 0.12))
+                    .frame(width: iconSize, height: iconSize)
                     .overlay(
                         Image(systemName: icon)
-                            .font(.system(size: 24, weight: .medium))
+                            .font(.system(size: iconFontSize, weight: .semibold))
                             .foregroundColor(accentColor)
                     )
 
                 // Text
                 VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
                     Text(title)
-                        .font(AppTypography.headlineSmall)
+                        .font(prominence == .primary ? AppTypography.headlineMedium : AppTypography.headlineSmall)
                         .foregroundColor(colors.textPrimary)
 
                     Text(subtitle)
@@ -41,14 +65,21 @@ struct HubActionCard: View {
 
                 Spacer()
 
-                // Arrow
+                // Arrow - more prominent for primary
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(colors.textSecondary)
+                    .font(.system(size: prominence == .primary ? 16 : 14, weight: .semibold))
+                    .foregroundColor(prominence == .primary ? accentColor.opacity(0.7) : colors.textSecondary)
             }
-            .padding(Theme.Spacing.lg)
-            .background(colors.surface)
+            .padding(.horizontal, Theme.Spacing.lg)
+            .padding(.vertical, verticalPadding)
+            .background(colors.surface.opacity(cardOpacity))
             .cornerRadius(Theme.Radius.lg)
+            .shadow(
+                color: prominence == .primary ? accentColor.opacity(0.15) : .black.opacity(0.05),
+                radius: prominence == .primary ? 12 : 4,
+                x: 0,
+                y: prominence == .primary ? 4 : 2
+            )
             .scaleEffect(isPressed ? 0.98 : 1.0)
         }
         .buttonStyle(PlainButtonStyle())
@@ -93,18 +124,20 @@ extension View {
         VStack(spacing: 16) {
             HubActionCard(
                 title: "Send Question",
-                subtitle: "Ask someone meaningful",
+                subtitle: "Prompt a meaningful memory",
                 icon: "paperplane.fill",
                 accentColor: Color.Dark.accentPrimary,
-                colors: AppColors(.dark)
+                colors: AppColors(.dark),
+                prominence: .primary
             ) {}
 
             HubActionCard(
                 title: "New Journal",
-                subtitle: "Start collecting stories",
+                subtitle: "Start a living story",
                 icon: "book.fill",
                 accentColor: Color.Dark.accentSecondary,
-                colors: AppColors(.dark)
+                colors: AppColors(.dark),
+                prominence: .standard
             ) {}
         }
         .padding()

@@ -12,6 +12,17 @@ struct HubView: View {
     @State private var showingJournals = false
     @State private var pendingJournalId: String?
     @State private var navigateToJournalId: String?
+    @State private var showFABTooltip = false
+
+    // Intent phrases - rotates to keep it fresh
+    private let intentPhrases = [
+        "Who do you want to hear from today?",
+        "Let's capture a story.",
+        "What memory matters right now?",
+        "A question can unlock a lifetime."
+    ]
+
+    @State private var currentIntentIndex = 0
 
     var body: some View {
         let colors = AppColors(colorScheme)
@@ -26,23 +37,26 @@ struct HubView: View {
 
                     ScrollView(showsIndicators: false) {
                         VStack(spacing: Theme.Spacing.lg) {
-                            // Welcome Header
+                            // Welcome Header with intent
                             welcomeHeader(colors: colors)
 
-                            // Primary Action Cards
-                            primaryActions(colors: colors)
+                            // Primary Action - THE one action
+                            primaryAction(colors: colors)
 
-                            // Secondary Actions
-                            secondaryActions(colors: colors)
+                            // Secondary Action
+                            secondaryAction(colors: colors)
 
-                            Spacer(minLength: Theme.Spacing.xxl)
+                            // Tertiary Actions
+                            tertiaryActions(colors: colors)
+
+                            Spacer(minLength: Theme.Spacing.xxl + 40) // Room for FAB
                         }
                         .padding(.horizontal, Theme.Spacing.lg)
                         .padding(.top, Theme.Spacing.md)
                     }
                 }
 
-                // Floating Record Button (optional)
+                // Floating Record Button with optional tooltip
                 VStack {
                     Spacer()
                     HStack {
@@ -59,7 +73,6 @@ struct HubView: View {
                     .preferredColorScheme(appState.colorScheme)
             }
             .sheet(isPresented: $showingNewJournal, onDismiss: {
-                // Navigate after sheet dismisses
                 if let journalId = pendingJournalId {
                     pendingJournalId = nil
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
@@ -86,6 +99,32 @@ struct HubView: View {
             .sheet(isPresented: $showingSendQuestion) {
                 SendQuestionSheet()
             }
+            .onAppear {
+                // Randomize intent phrase on appear
+                currentIntentIndex = Int.random(in: 0..<intentPhrases.count)
+
+                // Show FAB tooltip on first launch
+                checkFirstLaunchTooltip()
+            }
+        }
+    }
+
+    // MARK: - First Launch Tooltip
+    private func checkFirstLaunchTooltip() {
+        let hasSeenTooltip = UserDefaults.standard.bool(forKey: "hasSeenFABTooltip")
+        if !hasSeenTooltip {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    showFABTooltip = true
+                }
+                // Auto-dismiss after 4 seconds
+                DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        showFABTooltip = false
+                    }
+                    UserDefaults.standard.set(true, forKey: "hasSeenFABTooltip")
+                }
+            }
         }
     }
 
@@ -97,7 +136,7 @@ struct HubView: View {
             Button(action: { showingJournals = true }) {
                 Image(systemName: "line.3.horizontal")
                     .font(.system(size: 20, weight: .medium))
-                    .foregroundColor(colors.textSecondary)
+                    .foregroundColor(colors.textPrimary.opacity(0.7))
                     .frame(width: 44, height: 44)
             }
 
@@ -107,7 +146,7 @@ struct HubView: View {
             Button(action: { showingSettings = true }) {
                 Image(systemName: "gearshape")
                     .font(.system(size: 20, weight: .medium))
-                    .foregroundColor(colors.textSecondary)
+                    .foregroundColor(colors.textPrimary.opacity(0.7))
                     .frame(width: 44, height: 44)
             }
         }
@@ -117,55 +156,74 @@ struct HubView: View {
     // MARK: - Welcome Header
     @ViewBuilder
     private func welcomeHeader(colors: AppColors) -> some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
-            Text("Welcome back,")
-                .font(AppTypography.bodyLarge)
-                .foregroundColor(colors.textPrimary.opacity(0.8))
-                .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
+        let shadowColor = colorScheme == .dark ? Color.black.opacity(0.6) : Color.black.opacity(0.25)
+        let strongShadow = colorScheme == .dark ? Color.black.opacity(0.7) : Color.black.opacity(0.3)
 
-            Text(appState.currentUser?.displayName ?? "Friend")
-                .font(AppTypography.displayMedium)
-                .foregroundColor(colors.textPrimary)
-                .shadow(color: .black.opacity(0.4), radius: 3, x: 0, y: 1)
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            // Greeting
+            VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
+                Text("Welcome back,")
+                    .font(AppTypography.bodyLarge)
+                    .foregroundColor(colors.textPrimary)
+                    .shadow(color: shadowColor, radius: 3, x: 0, y: 1)
+                    .shadow(color: shadowColor, radius: 6, x: 0, y: 2)
+
+                Text(appState.currentUser?.displayName ?? "Friend")
+                    .font(AppTypography.displayMedium)
+                    .foregroundColor(colors.textPrimary)
+                    .shadow(color: strongShadow, radius: 4, x: 0, y: 2)
+                    .shadow(color: strongShadow, radius: 8, x: 0, y: 3)
+            }
+
+            // Intent line - subtle but readable
+            Text(intentPhrases[currentIntentIndex])
+                .font(AppTypography.bodyMedium)
+                .foregroundColor(colors.textPrimary.opacity(0.85))
+                .shadow(color: shadowColor, radius: 3, x: 0, y: 1)
+                .shadow(color: shadowColor, radius: 6, x: 0, y: 2)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.top, Theme.Spacing.sm)
+        .padding(.bottom, Theme.Spacing.sm)
     }
 
-    // MARK: - Primary Actions
+    // MARK: - Primary Action (THE one action)
     @ViewBuilder
-    private func primaryActions(colors: AppColors) -> some View {
-        VStack(spacing: Theme.Spacing.md) {
-            // Send Question Card
-            HubActionCard(
-                title: "Send Question",
-                subtitle: "Ask someone meaningful",
-                icon: "paperplane.fill",
-                accentColor: colors.accentPrimary,
-                colors: colors
-            ) {
-                showingSendQuestion = true
-            }
-
-            // New Journal Card
-            HubActionCard(
-                title: "New Journal",
-                subtitle: "Start collecting stories",
-                icon: "book.fill",
-                accentColor: colors.accentSecondary,
-                colors: colors
-            ) {
-                showingNewJournal = true
-            }
+    private func primaryAction(colors: AppColors) -> some View {
+        HubActionCard(
+            title: "Send Question",
+            subtitle: "Prompt a meaningful memory",
+            icon: "paperplane.fill",
+            accentColor: colors.accentPrimary,
+            colors: colors,
+            prominence: .primary
+        ) {
+            showingSendQuestion = true
         }
     }
 
-    // MARK: - Secondary Actions
+    // MARK: - Secondary Action
     @ViewBuilder
-    private func secondaryActions(colors: AppColors) -> some View {
+    private func secondaryAction(colors: AppColors) -> some View {
+        HubActionCard(
+            title: "New Journal",
+            subtitle: "Start a living story",
+            icon: "book.fill",
+            accentColor: colors.accentSecondary,
+            colors: colors,
+            prominence: .standard
+        ) {
+            showingNewJournal = true
+        }
+    }
+
+    // MARK: - Tertiary Actions
+    @ViewBuilder
+    private func tertiaryActions(colors: AppColors) -> some View {
         VStack(spacing: Theme.Spacing.sm) {
             SecondaryActionRow(
                 title: "My People",
+                subtitle: "The voices that matter",
                 icon: "person.2.fill",
                 colors: colors
             ) {
@@ -174,6 +232,7 @@ struct HubView: View {
 
             SecondaryActionRow(
                 title: "Latest Recordings",
+                subtitle: "Listen back",
                 icon: "waveform",
                 colors: colors
             ) {
@@ -185,19 +244,63 @@ struct HubView: View {
     // MARK: - Floating Record Button
     @ViewBuilder
     private func floatingRecordButton(colors: AppColors) -> some View {
-        Button(action: {
-            // Quick record action
-        }) {
-            Circle()
-                .fill(colors.accentPrimary)
-                .frame(width: 64, height: 64)
-                .overlay(
-                    Image(systemName: "mic.fill")
-                        .font(.system(size: 24, weight: .medium))
-                        .foregroundColor(.white)
-                )
-                .shadow(Theme.Shadow.lg)
+        ZStack(alignment: .topTrailing) {
+            Button(action: {
+                // Dismiss tooltip if showing
+                if showFABTooltip {
+                    withAnimation {
+                        showFABTooltip = false
+                    }
+                    UserDefaults.standard.set(true, forKey: "hasSeenFABTooltip")
+                }
+                // Quick record action
+            }) {
+                ZStack {
+                    // Outer glow for emphasis
+                    Circle()
+                        .fill(colors.accentPrimary.opacity(0.2))
+                        .frame(width: 72, height: 72)
+                        .blur(radius: 4)
+
+                    Circle()
+                        .fill(colors.accentPrimary)
+                        .frame(width: 64, height: 64)
+                        .overlay(
+                            // Mic with waveform hint
+                            HStack(spacing: 2) {
+                                Image(systemName: "mic.fill")
+                                    .font(.system(size: 22, weight: .medium))
+                                Image(systemName: "waveform")
+                                    .font(.system(size: 10, weight: .medium))
+                                    .opacity(0.7)
+                            }
+                            .foregroundColor(.white)
+                        )
+                        .shadow(color: colors.accentPrimary.opacity(0.4), radius: 8, x: 0, y: 4)
+                }
+            }
+
+            // First-use tooltip
+            if showFABTooltip {
+                tooltipView(colors: colors)
+                    .offset(x: -70, y: -10)
+                    .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .bottomTrailing)))
+            }
         }
+    }
+
+    @ViewBuilder
+    private func tooltipView(colors: AppColors) -> some View {
+        Text("Record a response or memory")
+            .font(AppTypography.caption)
+            .foregroundColor(colors.textPrimary)
+            .padding(.horizontal, Theme.Spacing.sm)
+            .padding(.vertical, Theme.Spacing.xs)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.Radius.sm)
+                    .fill(colors.surface)
+                    .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
+            )
     }
 }
 
