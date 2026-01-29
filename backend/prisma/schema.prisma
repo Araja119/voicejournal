@@ -41,21 +41,24 @@ model RefreshToken {
 }
 
 model Journal {
-  id             String   @id @default(uuid())
-  ownerId        String   @map("owner_id")
-  title          String
-  description    String?
-  coverImageUrl  String?  @map("cover_image_url")
-  privacySetting String   @default("private") @map("privacy_setting")
-  shareCode      String?  @unique @map("share_code")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  id                  String   @id @default(uuid())
+  ownerId             String   @map("owner_id")
+  title               String
+  description         String?
+  coverImageUrl       String?  @map("cover_image_url")
+  privacySetting      String   @default("private") @map("privacy_setting")
+  shareCode           String?  @unique @map("share_code")
+  dedicatedToPersonId String?  @map("dedicated_to_person_id")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
 
-  owner         User                  @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  collaborators JournalCollaborator[]
-  questions     Question[]
+  owner            User                  @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  dedicatedToPerson Person?              @relation(fields: [dedicatedToPersonId], references: [id], onDelete: SetNull)
+  collaborators    JournalCollaborator[]
+  questions        Question[]
 
   @@index([ownerId])
+  @@index([dedicatedToPersonId])
   @@map("journals")
 }
 
@@ -86,9 +89,10 @@ model Person {
   linkedUserId    String?  @map("linked_user_id")
   createdAt       DateTime @default(now()) @map("created_at")
 
-  owner       User                  @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  assignments QuestionAssignment[]
-  recordings  Recording[]
+  owner             User                  @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  assignments       QuestionAssignment[]
+  recordings        Recording[]
+  dedicatedJournals Journal[]
 
   @@index([ownerId])
   @@map("people")

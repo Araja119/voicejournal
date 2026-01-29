@@ -13,6 +13,7 @@ import {
   journalQuerySchema,
 } from '../validators/journals.validators.js';
 import * as journalsService from '../services/journals.service.js';
+import * as aiService from '../services/ai.service.js';
 import { success, created, noContent } from '../utils/responses.js';
 import { ValidationError } from '../utils/errors.js';
 
@@ -86,6 +87,34 @@ router.get(
     try {
       const journal = await journalsService.getJournal(req.user!.userId, req.params.journal_id as string);
       success(res, journal);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// GET /journals/:journal_id/suggested-questions
+router.get(
+  '/:journal_id/suggested-questions',
+  validate({ params: journalIdSchema }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const journal = await journalsService.getJournal(req.user!.userId, req.params.journal_id as string);
+
+      // Extract existing question texts to avoid duplicates
+      const existingQuestions = journal.questions.map(q => q.question_text);
+
+      // Generate AI suggestions
+      const count = parseInt(req.query.count as string) || 3;
+      const suggestions = await aiService.generateSuggestedQuestions({
+        journalTitle: journal.title,
+        journalDescription: journal.description,
+        recipientName: journal.dedicated_to_person?.name,
+        recipientRelationship: journal.dedicated_to_person?.relationship,
+        existingQuestions,
+      }, count);
+
+      success(res, { suggestions });
     } catch (err) {
       next(err);
     }

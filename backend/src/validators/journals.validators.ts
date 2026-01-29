@@ -4,12 +4,14 @@ export const createJournalSchema = z.object({
   title: z.string().min(1, 'Title is required').max(200),
   description: z.string().max(1000).optional(),
   privacy_setting: z.enum(['private', 'public', 'shared']).default('private'),
+  dedicated_to_person_id: z.string().uuid().optional(),
 });
 
 export const updateJournalSchema = z.object({
   title: z.string().min(1).max(200).optional(),
   description: z.string().max(1000).optional(),
   privacy_setting: z.enum(['private', 'public', 'shared']).optional(),
+  dedicated_to_person_id: z.string().uuid().nullable().optional(),
 });
 
 export const journalIdSchema = z.object({

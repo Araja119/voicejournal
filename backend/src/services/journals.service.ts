@@ -19,6 +19,12 @@ export interface JournalSummary {
     id: string;
     display_name: string;
   };
+  dedicated_to_person: {
+    id: string;
+    name: string;
+    relationship: string;
+    profile_photo_url: string | null;
+  } | null;
   is_owner: boolean;
   question_count: number;
   answered_count: number;
@@ -87,6 +93,7 @@ export async function listJournals(userId: string, query: JournalQueryInput): Pr
     where: { OR: whereConditions },
     include: {
       owner: true,
+      dedicatedToPerson: true,
       questions: {
         include: {
           assignments: {
@@ -123,6 +130,12 @@ export async function listJournals(userId: string, query: JournalQueryInput): Pr
         id: journal.owner.id,
         display_name: journal.owner.displayName,
       },
+      dedicated_to_person: journal.dedicatedToPerson ? {
+        id: journal.dedicatedToPerson.id,
+        name: journal.dedicatedToPerson.name,
+        relationship: journal.dedicatedToPerson.relationship,
+        profile_photo_url: journal.dedicatedToPerson.profilePhotoUrl,
+      } : null,
       is_owner: journal.ownerId === userId,
       question_count: journal.questions.length,
       answered_count: answeredCount,
@@ -142,10 +155,12 @@ export async function createJournal(userId: string, input: CreateJournalInput): 
       title: input.title,
       description: input.description,
       privacySetting: input.privacy_setting,
+      dedicatedToPersonId: input.dedicated_to_person_id,
       shareCode,
     },
     include: {
       owner: true,
+      dedicatedToPerson: true,
     },
   });
 
@@ -161,6 +176,12 @@ export async function createJournal(userId: string, input: CreateJournalInput): 
       id: journal.owner.id,
       display_name: journal.owner.displayName,
     },
+    dedicated_to_person: journal.dedicatedToPerson ? {
+      id: journal.dedicatedToPerson.id,
+      name: journal.dedicatedToPerson.name,
+      relationship: journal.dedicatedToPerson.relationship,
+      profile_photo_url: journal.dedicatedToPerson.profilePhotoUrl,
+    } : null,
     is_owner: true,
     question_count: 0,
     answered_count: 0,
@@ -176,6 +197,7 @@ export async function getJournal(userId: string, journalId: string): Promise<Jou
     where: { id: journalId },
     include: {
       owner: true,
+      dedicatedToPerson: true,
       collaborators: {
         include: { user: true },
       },
@@ -238,6 +260,12 @@ export async function getJournal(userId: string, journalId: string): Promise<Jou
       id: journal.owner.id,
       display_name: journal.owner.displayName,
     },
+    dedicated_to_person: journal.dedicatedToPerson ? {
+      id: journal.dedicatedToPerson.id,
+      name: journal.dedicatedToPerson.name,
+      relationship: journal.dedicatedToPerson.relationship,
+      profile_photo_url: journal.dedicatedToPerson.profilePhotoUrl,
+    } : null,
     is_owner: isOwner,
     question_count: journal.questions.length,
     answered_count: answeredCount,
@@ -289,6 +317,7 @@ export async function updateJournal(
       title: input.title,
       description: input.description,
       privacySetting: input.privacy_setting,
+      dedicatedToPersonId: input.dedicated_to_person_id,
     },
   });
 
