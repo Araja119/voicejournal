@@ -25,7 +25,9 @@ actor AuthManager {
 
     var hasValidTokens: Bool {
         get async {
-            await keychain.getAccessToken() != nil && await keychain.getRefreshToken() != nil
+            let accessToken = await keychain.getAccessToken()
+            let refreshToken = await keychain.getRefreshToken()
+            return accessToken != nil && refreshToken != nil
         }
     }
 

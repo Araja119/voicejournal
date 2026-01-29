@@ -47,12 +47,12 @@ struct TemplatePickerView: View {
             }
         }
         .task {
-            await viewModel.loadTemplates()
+            await viewModel.loadRelationships()
         }
     }
 
     private var groupedTemplates: [String: [QuestionTemplate]] {
-        Dictionary(grouping: viewModel.templates) { $0.category }
+        Dictionary(grouping: viewModel.templates) { $0.category ?? "Other" }
     }
 }
 
@@ -111,17 +111,13 @@ struct TemplateCard: View {
                     .multilineTextAlignment(.leading)
 
                 HStack {
-                    if let relationships = template.suggestedRelationships {
-                        ForEach(relationships.prefix(3), id: \.self) { relationship in
-                            Text(relationship)
-                                .font(AppTypography.caption)
-                                .foregroundColor(colors.accentPrimary)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 2)
-                                .background(colors.accentPrimary.opacity(0.15))
-                                .cornerRadius(Theme.Radius.sm)
-                        }
-                    }
+                    Text(template.displayRelationship)
+                        .font(AppTypography.caption)
+                        .foregroundColor(colors.accentPrimary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 2)
+                        .background(colors.accentPrimary.opacity(0.15))
+                        .cornerRadius(Theme.Radius.sm)
 
                     Spacer()
 

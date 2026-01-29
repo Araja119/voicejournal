@@ -44,7 +44,7 @@ class AppState: ObservableObject {
             isLoading = true
 
             // Check if we have stored tokens
-            if authManager.hasValidTokens {
+            if await authManager.hasValidTokens {
                 do {
                     // Try to fetch current user to validate session
                     let user = try await AuthService.shared.getCurrentUser()

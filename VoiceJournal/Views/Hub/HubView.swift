@@ -10,6 +10,8 @@ struct HubView: View {
     @State private var showingPeople = false
     @State private var showingRecordings = false
     @State private var showingJournals = false
+    @State private var pendingJournalId: String?
+    @State private var navigateToJournalId: String?
 
     var body: some View {
         let colors = AppColors(colorScheme)
@@ -56,10 +58,21 @@ struct HubView: View {
                 SettingsView()
                     .environmentObject(appState)
             }
-            .sheet(isPresented: $showingNewJournal) {
-                CreateJournalSheet(onCreate: { _ in
-                    // Journal created, could navigate to it
+            .sheet(isPresented: $showingNewJournal, onDismiss: {
+                // Navigate after sheet dismisses
+                if let journalId = pendingJournalId {
+                    pendingJournalId = nil
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        navigateToJournalId = journalId
+                    }
+                }
+            }) {
+                CreateJournalSheet(onCreate: { journal in
+                    pendingJournalId = journal.id
                 })
+            }
+            .navigationDestination(item: $navigateToJournalId) { journalId in
+                JournalDetailView(journalId: journalId)
             }
             .fullScreenCover(isPresented: $showingPeople) {
                 PeopleListView()
@@ -69,6 +82,9 @@ struct HubView: View {
             }
             .fullScreenCover(isPresented: $showingJournals) {
                 JournalsListView()
+            }
+            .sheet(isPresented: $showingSendQuestion) {
+                SendQuestionSheet()
             }
         }
     }

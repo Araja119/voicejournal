@@ -8,14 +8,12 @@ struct AvatarView: View {
 
     private var initials: String {
         let components = name.split(separator: " ")
-        if components.count >= 2 {
-            let first = components[0].prefix(1)
-            let last = components[1].prefix(1)
-            return "\(first)\(last)".uppercased()
-        } else if let first = components.first {
-            return String(first.prefix(2)).uppercased()
+        if components.isEmpty {
+            return "?"
         }
-        return "?"
+        // Take first letter of each word
+        let letters = components.prefix(2).compactMap { $0.first }
+        return String(letters).uppercased()
     }
 
     private var backgroundColor: Color {

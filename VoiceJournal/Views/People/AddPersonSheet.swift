@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 
 struct AddPersonSheet: View {
     @Environment(\.colorScheme) var colorScheme
@@ -8,6 +9,8 @@ struct AddPersonSheet: View {
     @State private var relationship = "parent"
     @State private var email = ""
     @State private var phoneNumber = ""
+    @State private var selectedPhoto: PhotosPickerItem?
+    @State private var selectedImageData: Data?
     @State private var isSaving = false
     @State private var error: String?
 
@@ -23,6 +26,47 @@ struct AddPersonSheet: View {
 
                 ScrollView {
                     VStack(spacing: Theme.Spacing.lg) {
+                        // Profile Photo
+                        VStack(spacing: Theme.Spacing.sm) {
+                            PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                                if let imageData = selectedImageData,
+                                   let uiImage = UIImage(data: imageData) {
+                                    Image(uiImage: uiImage)
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(width: 100, height: 100)
+                                        .clipShape(Circle())
+                                        .overlay(
+                                            Circle()
+                                                .stroke(colors.accentPrimary, lineWidth: 3)
+                                        )
+                                } else {
+                                    ZStack {
+                                        Circle()
+                                            .fill(colors.surface)
+                                            .frame(width: 100, height: 100)
+
+                                        Image(systemName: "person.crop.circle.badge.plus")
+                                            .font(.system(size: 40))
+                                            .foregroundColor(colors.textSecondary)
+                                    }
+                                }
+                            }
+                            .onChange(of: selectedPhoto) { _, newValue in
+                                Task {
+                                    if let data = try? await newValue?.loadTransferable(type: Data.self) {
+                                        selectedImageData = data
+                                    }
+                                }
+                            }
+
+                            Text("Add Photo")
+                                .font(AppTypography.caption)
+                                .foregroundColor(colors.accentPrimary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, Theme.Spacing.md)
+
                         // Name
                         InputField(
                             title: "Name",
@@ -132,6 +176,16 @@ struct AddPersonSheet: View {
                     phoneNumber: phoneNumber.isEmpty ? nil : phoneNumber
                 )
                 let person = try await PeopleService.shared.createPerson(request)
+
+                // Upload photo if selected
+                if let imageData = selectedImageData {
+                    _ = try? await PeopleService.shared.uploadPhoto(
+                        personId: person.id,
+                        imageData: imageData,
+                        mimeType: "image/jpeg"
+                    )
+                }
+
                 onSave(person)
                 dismiss()
             } catch {

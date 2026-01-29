@@ -5,6 +5,7 @@ struct PeopleListView: View {
     @Environment(\.dismiss) var dismiss
     @StateObject private var viewModel = PeopleViewModel()
     @State private var showingAddPerson = false
+    @State private var selectedPerson: Person?
 
     var body: some View {
         let colors = AppColors(colorScheme)
@@ -30,6 +31,9 @@ struct PeopleListView: View {
                         LazyVStack(spacing: Theme.Spacing.md) {
                             ForEach(viewModel.people) { person in
                                 PersonCard(person: person, colors: colors)
+                                    .onTapGesture {
+                                        selectedPerson = person
+                                    }
                             }
                         }
                         .padding(.horizontal, Theme.Spacing.lg)
@@ -43,7 +47,9 @@ struct PeopleListView: View {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button(action: { dismiss() }) {
                         Image(systemName: "xmark")
-                            .foregroundColor(colors.textSecondary)
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(colors.textPrimary)
+                            .frame(width: 44, height: 44)
                     }
                 }
 
@@ -56,6 +62,13 @@ struct PeopleListView: View {
             }
             .sheet(isPresented: $showingAddPerson) {
                 AddPersonSheet(onSave: { _ in
+                    Task { await viewModel.loadPeople() }
+                })
+            }
+            .sheet(item: $selectedPerson) { person in
+                EditPersonSheet(person: person, onSave: {
+                    Task { await viewModel.loadPeople() }
+                }, onDelete: {
                     Task { await viewModel.loadPeople() }
                 })
             }

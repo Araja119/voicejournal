@@ -10,6 +10,7 @@ struct Journal: Codable, Identifiable, Equatable {
     let shareCode: String?
     let shareLink: String?
     let owner: JournalOwner
+    let dedicatedToPerson: JournalPerson?
     let isOwner: Bool
     let questionCount: Int
     let answeredCount: Int
@@ -61,6 +62,7 @@ struct CreateJournalRequest: Codable {
     let title: String
     var description: String?
     var privacySetting: String = "private"
+    var dedicatedToPersonId: String?
 }
 
 // MARK: - Update Journal Request

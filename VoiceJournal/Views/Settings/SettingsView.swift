@@ -46,15 +46,19 @@ struct SettingsView: View {
 
                     // Appearance Section
                     Section("Appearance") {
-                        Toggle(isOn: $appState.isDarkMode) {
+                        Toggle(isOn: Binding(
+                            get: { appState.isDarkMode },
+                            set: { newValue in
+                                if newValue != appState.isDarkMode {
+                                    appState.toggleTheme()
+                                }
+                            }
+                        )) {
                             HStack {
                                 Image(systemName: "moon.fill")
                                     .foregroundColor(colors.accentPrimary)
                                 Text("Dark Mode")
                             }
-                        }
-                        .onChange(of: appState.isDarkMode) { _, _ in
-                            appState.toggleTheme()
                         }
                     }
                     .listRowBackground(colors.surface)
