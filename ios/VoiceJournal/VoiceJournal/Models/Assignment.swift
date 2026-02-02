@@ -5,6 +5,7 @@ struct Assignment: Codable, Identifiable, Equatable {
     let id: String
     let personId: String
     let personName: String?
+    let personProfilePhotoUrl: String?
     let status: AssignmentStatus
     let uniqueLinkToken: String?
     let recordingLink: String?

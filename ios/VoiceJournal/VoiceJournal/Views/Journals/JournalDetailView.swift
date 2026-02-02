@@ -38,6 +38,12 @@ struct JournalDetailView: View {
     @State private var playbackRecording: Recording?
     @State private var debugMessage: String?
 
+    // Journal editing state
+    @State private var showingEditJournal = false
+    @State private var editedJournalTitle = ""
+    @State private var editedJournalDescription = ""
+    @State private var isSavingJournal = false
+
     // Fallback questions if AI fetch fails
     private let fallbackQuestions: [SuggestedQuestion] = [
         SuggestedQuestion(question: "What's one childhood memory that still makes you smile?", category: "memories"),
@@ -91,6 +97,14 @@ struct JournalDetailView: View {
                     }
 
                     Menu {
+                        Button(action: {
+                            editedJournalTitle = viewModel.journal?.title ?? ""
+                            editedJournalDescription = viewModel.journal?.description ?? ""
+                            showingEditJournal = true
+                        }) {
+                            Label("Edit", systemImage: "pencil")
+                        }
+
                         Button(role: .destructive, action: { showingDeleteConfirmation = true }) {
                             Label("Delete Journal", systemImage: "trash")
                         }
@@ -141,6 +155,19 @@ struct JournalDetailView: View {
                 onCancel: {
                     showingEditQuestion = false
                     questionToEdit = nil
+                }
+            )
+        }
+        .sheet(isPresented: $showingEditJournal) {
+            EditJournalSheet(
+                title: $editedJournalTitle,
+                description: $editedJournalDescription,
+                isSaving: isSavingJournal,
+                onSave: {
+                    saveEditedJournal()
+                },
+                onCancel: {
+                    showingEditJournal = false
                 }
             )
         }
@@ -251,6 +278,28 @@ struct JournalDetailView: View {
             showingEditQuestion = false
             questionToEdit = nil
             editedQuestionText = ""
+        }
+    }
+
+    private func saveEditedJournal() {
+        let trimmedTitle = editedJournalTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedTitle.isEmpty else { return }
+
+        isSavingJournal = true
+
+        Task {
+            do {
+                let request = UpdateJournalRequest(
+                    title: trimmedTitle,
+                    description: editedJournalDescription.isEmpty ? nil : editedJournalDescription
+                )
+                _ = try await JournalService.shared.updateJournal(id: journalId, request)
+                await viewModel.loadJournal(id: journalId)
+            } catch {
+                print("Failed to update journal: \(error)")
+            }
+            isSavingJournal = false
+            showingEditJournal = false
         }
     }
 
@@ -889,17 +938,6 @@ struct QuestionTimelineCard: View {
     @ViewBuilder
     private var draftContent: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-            // Status label - only show for non-self journals
-            if !isSelfJournal {
-                Text("Draft")
-                    .font(AppTypography.caption)
-                    .foregroundColor(colors.textSecondary)
-                    .padding(.horizontal, Theme.Spacing.sm)
-                    .padding(.vertical, Theme.Spacing.xxs)
-                    .background(colors.textSecondary.opacity(0.15))
-                    .cornerRadius(Theme.Radius.sm)
-            }
-
             // CTA - different for self-journals vs regular journals
             if isSelfJournal {
                 // Self-journal: "Record Answer" button (purple accent)
@@ -972,7 +1010,7 @@ struct QuestionTimelineCard: View {
                 ForEach(assignments) { assignment in
                     HStack {
                         if let name = assignment.personName {
-                            AvatarView(name: name, size: 24, colors: colors)
+                            AvatarView(name: name, imageURL: assignment.personProfilePhotoUrl, size: 24, colors: colors)
 
                             Text(name)
                                 .font(AppTypography.bodySmall)
@@ -1040,7 +1078,7 @@ struct QuestionTimelineCard: View {
             ForEach(assignments) { assignment in
                 HStack {
                     if let name = assignment.personName {
-                        AvatarView(name: name, size: 28, colors: colors)
+                        AvatarView(name: name, imageURL: assignment.personProfilePhotoUrl, size: 28, colors: colors)
 
                         VStack(alignment: .leading, spacing: 2) {
                             Text(name)
@@ -1116,7 +1154,7 @@ struct QuestionCard: View {
     private func assignmentRow(assignment: Assignment, colors: AppColors) -> some View {
         HStack {
             if let name = assignment.personName {
-                AvatarView(name: name, size: 32, colors: colors)
+                AvatarView(name: name, imageURL: assignment.personProfilePhotoUrl, size: 32, colors: colors)
 
                 Text(name)
                     .font(AppTypography.bodySmall)
@@ -1196,6 +1234,96 @@ struct EditQuestionSheet: View {
             }
             .onAppear {
                 isTextFieldFocused = true
+            }
+        }
+    }
+}
+
+// MARK: - Edit Journal Sheet
+struct EditJournalSheet: View {
+    @Binding var title: String
+    @Binding var description: String
+    let isSaving: Bool
+    let onSave: () -> Void
+    let onCancel: () -> Void
+
+    @Environment(\.colorScheme) var colorScheme
+    @FocusState private var focusedField: Field?
+
+    enum Field {
+        case title, description
+    }
+
+    var body: some View {
+        let colors = AppColors(colorScheme)
+
+        NavigationStack {
+            ZStack {
+                colors.background.ignoresSafeArea()
+
+                VStack(spacing: Theme.Spacing.lg) {
+                    // Title field
+                    VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                        Text("Title")
+                            .font(AppTypography.labelMedium)
+                            .foregroundColor(colors.textSecondary)
+
+                        TextField("Journal title", text: $title)
+                            .font(AppTypography.bodyLarge)
+                            .foregroundColor(colors.textPrimary)
+                            .padding(Theme.Spacing.md)
+                            .background(colors.surface)
+                            .cornerRadius(Theme.Radius.md)
+                            .focused($focusedField, equals: .title)
+                    }
+
+                    // Description field
+                    VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                        Text("Description (optional)")
+                            .font(AppTypography.labelMedium)
+                            .foregroundColor(colors.textSecondary)
+
+                        TextEditor(text: $description)
+                            .font(AppTypography.bodyMedium)
+                            .foregroundColor(colors.textPrimary)
+                            .scrollContentBackground(.hidden)
+                            .padding(Theme.Spacing.md)
+                            .background(colors.surface)
+                            .cornerRadius(Theme.Radius.md)
+                            .frame(minHeight: 100)
+                            .focused($focusedField, equals: .description)
+                    }
+
+                    Spacer()
+                }
+                .padding(Theme.Spacing.lg)
+            }
+            .navigationTitle("Edit Journal")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        onCancel()
+                    }
+                    .foregroundColor(colors.textSecondary)
+                    .disabled(isSaving)
+                }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    if isSaving {
+                        ProgressView()
+                    } else {
+                        Button("Save") {
+                            onSave()
+                        }
+                        .fontWeight(.semibold)
+                        .foregroundColor(colors.accentPrimary)
+                        .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
+                }
+            }
+            .onAppear {
+                focusedField = .title
             }
         }
     }

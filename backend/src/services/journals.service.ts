@@ -51,6 +51,7 @@ export interface JournalDetail extends JournalSummary {
       id: string;
       person_id: string;
       person_name: string;
+      person_profile_photo_url: string | null;
       status: string;
       recording: {
         id: string;
@@ -284,6 +285,7 @@ export async function getJournal(userId: string, journalId: string): Promise<Jou
         id: a.id,
         person_id: a.personId,
         person_name: a.person.name,
+        person_profile_photo_url: a.person.profilePhotoUrl,
         status: a.status,
         recording: a.recordings[0]
           ? {
