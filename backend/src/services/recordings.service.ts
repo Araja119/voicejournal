@@ -26,6 +26,7 @@ export interface RecordingSummary {
   person: {
     id: string;
     name: string;
+    profile_photo_url: string | null;
   };
   journal: {
     id: string;
@@ -234,6 +235,7 @@ export async function listRecordings(
       person: {
         id: r.assignment.person.id,
         name: r.assignment.person.name,
+        profile_photo_url: r.assignment.person.profilePhotoUrl,
       },
       journal: {
         id: r.assignment.question.journal.id,
@@ -282,6 +284,7 @@ export async function getRecording(userId: string, recordingId: string): Promise
     person: {
       id: recording.assignment.person.id,
       name: recording.assignment.person.name,
+      profile_photo_url: recording.assignment.person.profilePhotoUrl,
     },
     journal: {
       id: recording.assignment.question.journal.id,
@@ -434,6 +437,7 @@ export async function createAuthenticatedRecording(
         person: {
           id: existingRecording.assignment.person.id,
           name: existingRecording.assignment.person.name,
+          profile_photo_url: existingRecording.assignment.person.profilePhotoUrl,
         },
         journal: {
           id: existingRecording.assignment.question.journal.id,
@@ -559,6 +563,7 @@ export async function createAuthenticatedRecording(
     person: {
       id: recording.assignment.person.id,
       name: recording.assignment.person.name,
+      profile_photo_url: recording.assignment.person.profilePhotoUrl,
     },
     journal: {
       id: recording.assignment.question.journal.id,

@@ -11,6 +11,8 @@ struct ProfileEditView: View {
     @State private var isSaving = false
     @State private var error: String?
     @State private var selectedPhoto: PhotosPickerItem?
+    @State private var selectedImageData: Data?
+    @State private var selectedImage: UIImage?
 
     var body: some View {
         let colors = AppColors(colorScheme)
@@ -25,12 +27,21 @@ struct ProfileEditView: View {
                     VStack(spacing: Theme.Spacing.sm) {
                         PhotosPicker(selection: $selectedPhoto, matching: .images) {
                             ZStack {
-                                AvatarView(
-                                    name: displayName.isEmpty ? "U" : displayName,
-                                    imageURL: appState.currentUser?.profilePhotoUrl,
-                                    size: 100,
-                                    colors: colors
-                                )
+                                // Show selected image if available, otherwise show avatar
+                                if let selectedImage = selectedImage {
+                                    Image(uiImage: selectedImage)
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                        .frame(width: 100, height: 100)
+                                        .clipShape(Circle())
+                                } else {
+                                    AvatarView(
+                                        name: displayName.isEmpty ? "U" : displayName,
+                                        imageURL: appState.currentUser?.profilePhotoUrl,
+                                        size: 100,
+                                        colors: colors
+                                    )
+                                }
 
                                 Circle()
                                     .fill(colors.accentPrimary)
@@ -41,6 +52,14 @@ struct ProfileEditView: View {
                                             .foregroundColor(.white)
                                     )
                                     .offset(x: 35, y: 35)
+                            }
+                        }
+                        .onChange(of: selectedPhoto) { _, newValue in
+                            Task {
+                                if let data = try? await newValue?.loadTransferable(type: Data.self) {
+                                    selectedImageData = data
+                                    selectedImage = UIImage(data: data)
+                                }
                             }
                         }
 
@@ -108,6 +127,15 @@ struct ProfileEditView: View {
 
         Task {
             do {
+                // Upload photo if selected
+                if let imageData = selectedImageData {
+                    let _ = try await AuthService.shared.uploadProfilePhoto(
+                        imageData: imageData,
+                        mimeType: "image/jpeg"
+                    )
+                }
+
+                // Update user info
                 let request = UpdateUserRequest(
                     displayName: displayName,
                     phoneNumber: phoneNumber.isEmpty ? nil : phoneNumber

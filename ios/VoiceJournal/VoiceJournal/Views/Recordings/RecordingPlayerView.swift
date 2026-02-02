@@ -28,6 +28,7 @@ struct RecordingPlayerView: View {
                         VStack(spacing: Theme.Spacing.md) {
                             AvatarView(
                                 name: person.name,
+                                imageURL: person.profilePhotoUrl,
                                 size: 120,
                                 colors: colors
                             )
@@ -250,7 +251,7 @@ struct RecordingPlayerView: View {
         recording: Recording(
             id: "1",
             question: RecordingQuestionInfo(id: "q1", questionText: "What's your favorite childhood memory?"),
-            person: RecordingPersonInfo(id: "p1", name: "Mom"),
+            person: RecordingPersonInfo(id: "p1", name: "Mom", profilePhotoUrl: nil),
             journal: RecordingJournalInfo(id: "j1", title: "Family Stories"),
             audioUrl: "https://example.com/audio.m4a",
             durationSeconds: 125,

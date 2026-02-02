@@ -93,7 +93,7 @@ struct RecordingsListView: View {
         // Create sections and sort by person name
         return grouped.compactMap { personId, recordings -> RecordingSection? in
             guard let firstRecording = recordings.first else { return nil }
-            let person = firstRecording.person ?? RecordingPersonInfo(id: "unknown", name: "Unknown")
+            let person = firstRecording.person ?? RecordingPersonInfo(id: "unknown", name: "Unknown", profilePhotoUrl: nil)
             // Sort recordings by date (most recent first)
             let sortedRecordings = recordings.sorted { ($0.recordedAt ?? .distantPast) > ($1.recordedAt ?? .distantPast) }
             return RecordingSection(personId: personId, person: person, recordings: sortedRecordings)
@@ -153,6 +153,7 @@ struct PersonRecordingSection: View {
                     // Avatar
                     AvatarView(
                         name: section.person.name,
+                        imageURL: section.person.profilePhotoUrl,
                         size: 44,
                         colors: colors
                     )

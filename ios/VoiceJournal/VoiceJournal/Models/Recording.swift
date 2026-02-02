@@ -32,6 +32,7 @@ struct RecordingQuestionInfo: Codable {
 struct RecordingPersonInfo: Codable {
     let id: String
     let name: String
+    let profilePhotoUrl: String?
 }
 
 struct RecordingJournalInfo: Codable {
