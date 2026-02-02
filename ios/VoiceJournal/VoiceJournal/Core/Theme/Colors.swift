@@ -21,6 +21,9 @@ extension Color {
 
         /// Warm Gold - Completion/confirmation accent (#E5AE56)
         static let accentSecondary = Color(hex: "E5AE56")
+
+        /// Rich Purple - Self-recording accent (#7C3AED)
+        static let accentRecord = Color(hex: "7C3AED")
     }
 
     // MARK: - Light Mode Colors
@@ -42,6 +45,9 @@ extension Color {
 
         /// Amber - Secondary accent (#C47F17)
         static let accentSecondary = Color(hex: "C47F17")
+
+        /// Rich Purple - Self-recording accent (#8B5CF6)
+        static let accentRecord = Color(hex: "8B5CF6")
     }
 }
 
@@ -103,6 +109,10 @@ struct AppColors {
 
     var accentSecondary: Color {
         colorScheme == .dark ? Color.Dark.accentSecondary : Color.Light.accentSecondary
+    }
+
+    var accentRecord: Color {
+        colorScheme == .dark ? Color.Dark.accentRecord : Color.Light.accentRecord
     }
 }
 

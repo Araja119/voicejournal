@@ -90,17 +90,17 @@ struct StaticWaveformView: View {
     let progress: Double
     let colors: AppColors
 
-    private let barCount = 60
+    private let barCount = 50
 
     var body: some View {
         GeometryReader { geometry in
-            HStack(spacing: 2) {
+            HStack(spacing: 3) {
                 ForEach(0..<barCount, id: \.self) { index in
                     let height = randomHeight(for: index, maxHeight: geometry.size.height)
                     let isFilled = Double(index) / Double(barCount) <= progress
 
-                    RoundedRectangle(cornerRadius: 1)
-                        .fill(isFilled ? colors.accentPrimary : colors.textSecondary.opacity(0.3))
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(isFilled ? colors.accentPrimary : Color.white.opacity(0.25))
                         .frame(height: height)
                 }
             }
@@ -111,7 +111,7 @@ struct StaticWaveformView: View {
         // Seeded pseudo-random based on index for consistent appearance
         let seed = Double(index * 7 + 13)
         let random = (sin(seed) + 1) / 2 // 0-1 range
-        return maxHeight * CGFloat(0.2 + (random * 0.6))
+        return maxHeight * CGFloat(0.15 + (random * 0.7))
     }
 }
 

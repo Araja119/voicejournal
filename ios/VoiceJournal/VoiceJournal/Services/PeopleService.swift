@@ -33,6 +33,26 @@ class PeopleService {
         try await client.requestNoContent(.deletePerson(id: id))
     }
 
+    // MARK: - Ensure "Myself" Person Exists
+    /// Checks if a "self" person record exists, creates one if not
+    func ensureMyselfExists(user: User) async throws -> Person {
+        // First, check if "myself" person already exists
+        let people = try await listPeople()
+        if let myself = people.first(where: { $0.isSelf }) {
+            return myself
+        }
+
+        // Create "myself" person if doesn't exist
+        let request = CreatePersonRequest(
+            name: user.displayName,
+            relationship: "self",
+            email: user.email,
+            phoneNumber: user.phoneNumber,
+            linkedUserId: user.id
+        )
+        return try await createPerson(request)
+    }
+
     // MARK: - Upload Person Photo
     func uploadPhoto(personId: String, imageData: Data, mimeType: String) async throws -> PersonPhotoResponse {
         let fileName = "photo.\(mimeType == "image/png" ? "png" : "jpg")"

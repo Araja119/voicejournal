@@ -65,4 +65,29 @@ class RecordingService {
             additionalFields: additionalFields
         )
     }
+
+    // MARK: - Upload Recording (Authenticated - Self Recording)
+    /// Upload a recording as the authenticated user for self-journaling
+    func uploadRecordingAuthenticated(
+        journalId: String,
+        questionId: String,
+        audioData: Data,
+        durationSeconds: Int?,
+        idempotencyKey: String
+    ) async throws -> Recording {
+        var additionalFields: [String: String]? = nil
+        if let duration = durationSeconds {
+            additionalFields = ["duration_seconds": String(duration)]
+        }
+
+        return try await client.upload(
+            .uploadAuthenticatedRecording(journalId: journalId, questionId: questionId),
+            fileData: audioData,
+            fileName: "recording.m4a",
+            mimeType: "audio/mp4",
+            fieldName: "audio",
+            additionalFields: additionalFields,
+            additionalHeaders: ["Idempotency-Key": idempotencyKey]
+        )
+    }
 }

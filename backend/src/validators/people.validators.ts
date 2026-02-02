@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 export const relationshipTypes = [
+  'self',
   'parent',
   'grandparent',
   'spouse',
@@ -19,6 +20,7 @@ export const createPersonSchema = z.object({
   relationship: z.enum(relationshipTypes),
   email: z.string().email().optional().or(z.literal('')),
   phone_number: z.string().optional(),
+  linked_user_id: z.string().uuid().optional(),
 });
 
 export const updatePersonSchema = z.object({

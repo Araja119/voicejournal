@@ -13,6 +13,8 @@ import { success, created, noContent, accepted } from '../utils/responses.js';
 import { ValidationError } from '../utils/errors.js';
 
 const router = Router();
+const publicRouter = Router(); // Separate router for public routes
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 50 * 1024 * 1024 }, // 50MB for audio
@@ -26,54 +28,7 @@ const upload = multer({
 });
 
 // ==========================================
-// PUBLIC ROUTES (no auth required)
-// ==========================================
-
-// GET /record/:link_token - Get recording page data
-router.get(
-  '/:link_token',
-  validate({ params: linkTokenSchema }),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const data = await recordingsService.getRecordingPageData(req.params.link_token as string);
-      success(res, data);
-    } catch (err) {
-      next(err);
-    }
-  }
-);
-
-// POST /record/:link_token/upload - Upload recording
-router.post(
-  '/:link_token/upload',
-  uploadLimiter,
-  validate({ params: linkTokenSchema }),
-  upload.single('audio'),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      if (!req.file) {
-        throw new ValidationError('No audio file uploaded');
-      }
-
-      const durationSeconds = req.body.duration_seconds
-        ? parseInt(req.body.duration_seconds, 10)
-        : undefined;
-
-      const result = await recordingsService.uploadRecording(
-        req.params.link_token as string,
-        req.file.buffer,
-        durationSeconds
-      );
-
-      created(res, result);
-    } catch (err) {
-      next(err);
-    }
-  }
-);
-
-// ==========================================
-// AUTHENTICATED ROUTES
+// AUTHENTICATED ROUTES (on main router, mounted at /recordings)
 // ==========================================
 
 // GET /recordings - List all recordings
@@ -103,6 +58,53 @@ router.get(
         req.params.recording_id as string
       );
       success(res, recording);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ==========================================
+// PUBLIC ROUTES (on publicRouter, mounted at /record)
+// ==========================================
+
+// GET /record/:link_token - Get recording page data
+publicRouter.get(
+  '/:link_token',
+  validate({ params: linkTokenSchema }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const data = await recordingsService.getRecordingPageData(req.params.link_token as string);
+      success(res, data);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// POST /record/:link_token/upload - Upload recording
+publicRouter.post(
+  '/:link_token/upload',
+  uploadLimiter,
+  validate({ params: linkTokenSchema }),
+  upload.single('audio'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.file) {
+        throw new ValidationError('No audio file uploaded');
+      }
+
+      const durationSeconds = req.body.duration_seconds
+        ? parseInt(req.body.duration_seconds, 10)
+        : undefined;
+
+      const result = await recordingsService.uploadRecording(
+        req.params.link_token as string,
+        req.file.buffer,
+        durationSeconds
+      );
+
+      created(res, result);
     } catch (err) {
       next(err);
     }
@@ -143,3 +145,4 @@ router.post(
 );
 
 export default router;
+export { publicRouter as recordPublicRouter };

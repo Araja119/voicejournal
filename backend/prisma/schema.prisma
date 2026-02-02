@@ -153,21 +153,23 @@ model QuestionAssignment {
 }
 
 model Recording {
-  id            String    @id @default(uuid())
-  assignmentId  String    @map("assignment_id")
-  personId      String?   @map("person_id")
-  audioFileUrl  String    @map("audio_file_url")
-  durationSeconds Int?    @map("duration_seconds")
-  fileSizeBytes BigInt?   @map("file_size_bytes")
-  transcription String?
-  recordedAt    DateTime? @map("recorded_at")
-  uploadedAt    DateTime  @default(now()) @map("uploaded_at")
+  id              String    @id @default(uuid())
+  assignmentId    String    @map("assignment_id")
+  personId        String?   @map("person_id")
+  audioFileUrl    String    @map("audio_file_url")
+  durationSeconds Int?      @map("duration_seconds")
+  fileSizeBytes   BigInt?   @map("file_size_bytes")
+  transcription   String?
+  idempotencyKey  String?   @map("idempotency_key")
+  recordedAt      DateTime? @map("recorded_at")
+  uploadedAt      DateTime  @default(now()) @map("uploaded_at")
 
   assignment   QuestionAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
   person       Person?            @relation(fields: [personId], references: [id])
   notifications Notification[]
 
   @@index([assignmentId])
+  @@index([idempotencyKey])
   @@map("recordings")
 }
 

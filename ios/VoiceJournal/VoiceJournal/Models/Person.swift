@@ -27,6 +27,11 @@ struct Person: Codable, Identifiable, Equatable {
         }
         return String(name.prefix(2)).uppercased()
     }
+
+    /// Returns true if this person represents the current user (self-journaling)
+    var isSelf: Bool {
+        relationship.lowercased() == "self"
+    }
 }
 
 // MARK: - Person Detail (with recordings)
@@ -108,12 +113,13 @@ struct RelationshipType: Codable, Identifiable, Equatable {
     }
 
     static let allTypes = [
-        "parent", "grandparent", "spouse", "partner", "sibling",
+        "self", "parent", "grandparent", "spouse", "partner", "sibling",
         "child", "friend", "coworker", "boss", "mentor", "other"
     ]
 
     static func displayName(for type: String) -> String {
         switch type.lowercased() {
+        case "self": return "Myself"
         case "parent": return "Parent"
         case "grandparent": return "Grandparent"
         case "spouse": return "Spouse"

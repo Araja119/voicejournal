@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import prisma from '../utils/prisma.js';
 import { NotFoundError, ForbiddenError, ValidationError } from '../utils/errors.js';
 import { uploadAudio, getSignedUrl } from '../mocks/storage.js';
@@ -363,5 +364,209 @@ export async function requestTranscription(
   return {
     message: 'Transcription started',
     estimated_time_seconds: 30,
+  };
+}
+
+/**
+ * Creates a recording for an authenticated user (self-recording flow).
+ * This is used when the journal owner records their own answer to a question.
+ */
+export async function createAuthenticatedRecording(
+  userId: string,
+  journalId: string,
+  questionId: string,
+  audioBuffer: Buffer,
+  contentType: string,
+  durationSeconds?: number,
+  idempotencyKey?: string
+): Promise<RecordingSummary> {
+  // 1. Verify journal ownership
+  const journal = await prisma.journal.findUnique({
+    where: { id: journalId },
+    include: { owner: true },
+  });
+
+  if (!journal) {
+    throw new NotFoundError('Journal');
+  }
+
+  if (journal.ownerId !== userId) {
+    throw new ForbiddenError('You do not own this journal');
+  }
+
+  // 2. Verify question belongs to journal
+  const question = await prisma.question.findUnique({
+    where: { id: questionId },
+  });
+
+  if (!question) {
+    throw new NotFoundError('Question');
+  }
+
+  if (question.journalId !== journalId) {
+    throw new ForbiddenError('Question does not belong to this journal');
+  }
+
+  // 3. Check idempotency (if key provided)
+  if (idempotencyKey) {
+    const existingRecording = await prisma.recording.findFirst({
+      where: { idempotencyKey },
+      include: {
+        assignment: {
+          include: {
+            question: {
+              include: { journal: true },
+            },
+            person: true,
+          },
+        },
+      },
+    });
+
+    if (existingRecording) {
+      // Return existing recording (idempotent)
+      return {
+        id: existingRecording.id,
+        question: {
+          id: existingRecording.assignment.question.id,
+          question_text: existingRecording.assignment.question.questionText,
+        },
+        person: {
+          id: existingRecording.assignment.person.id,
+          name: existingRecording.assignment.person.name,
+        },
+        journal: {
+          id: existingRecording.assignment.question.journal.id,
+          title: existingRecording.assignment.question.journal.title,
+        },
+        audio_url: getSignedUrl(existingRecording.audioFileUrl),
+        duration_seconds: existingRecording.durationSeconds,
+        transcription: existingRecording.transcription,
+        recorded_at: existingRecording.recordedAt,
+      };
+    }
+  }
+
+  // 4. Get or create "myself" person for this user
+  let myselfPerson = await prisma.person.findFirst({
+    where: {
+      ownerId: userId,
+      relationship: 'self',
+    },
+  });
+
+  if (!myselfPerson) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundError('User');
+    }
+
+    myselfPerson = await prisma.person.create({
+      data: {
+        ownerId: userId,
+        name: user.displayName,
+        relationship: 'self',
+        email: user.email,
+        phoneNumber: user.phoneNumber,
+        linkedUserId: userId,
+      },
+    });
+  }
+
+  // 5. Get or create assignment for this question + person
+  let assignment = await prisma.questionAssignment.findFirst({
+    where: {
+      questionId: questionId,
+      personId: myselfPerson.id,
+    },
+    include: { recordings: true },
+  });
+
+  if (assignment && assignment.recordings.length > 0) {
+    // V1: Don't allow re-recording, must delete existing first
+    throw new ValidationError('This question already has a recording. Delete it first to re-record.');
+  }
+
+  if (!assignment) {
+    assignment = await prisma.questionAssignment.create({
+      data: {
+        questionId: questionId,
+        personId: myselfPerson.id,
+        status: 'pending',
+        uniqueLinkToken: randomUUID(), // Required field
+      },
+      include: { recordings: true },
+    });
+  }
+
+  // 6. Validate audio format
+  const allowedMimeTypes = ['audio/mp4', 'audio/x-m4a', 'audio/mpeg', 'audio/m4a', 'audio/aac'];
+  if (!allowedMimeTypes.includes(contentType)) {
+    throw new ValidationError(`Invalid audio format: ${contentType}. Use m4a or mp3.`);
+  }
+
+  // 7. Validate duration (server-side)
+  if (durationSeconds && durationSeconds > 180) {
+    throw new ValidationError('Recording exceeds 3 minute limit');
+  }
+
+  // 8. Upload audio file
+  const uploadResult = await uploadAudio(
+    audioBuffer,
+    userId,
+    journalId,
+    assignment.id
+  );
+
+  // 9. Create recording record
+  const recording = await prisma.recording.create({
+    data: {
+      assignmentId: assignment.id,
+      personId: myselfPerson.id,
+      audioFileUrl: uploadResult.url,
+      durationSeconds: durationSeconds || null,
+      fileSizeBytes: BigInt(uploadResult.size),
+      idempotencyKey: idempotencyKey || null,
+      recordedAt: new Date(),
+    },
+    include: {
+      assignment: {
+        include: {
+          question: {
+            include: { journal: true },
+          },
+          person: true,
+        },
+      },
+    },
+  });
+
+  // 10. Update assignment status to answered
+  await prisma.questionAssignment.update({
+    where: { id: assignment.id },
+    data: {
+      status: 'answered',
+      answeredAt: new Date(),
+    },
+  });
+
+  return {
+    id: recording.id,
+    question: {
+      id: recording.assignment.question.id,
+      question_text: recording.assignment.question.questionText,
+    },
+    person: {
+      id: recording.assignment.person.id,
+      name: recording.assignment.person.name,
+    },
+    journal: {
+      id: recording.assignment.question.journal.id,
+      title: recording.assignment.question.journal.title,
+    },
+    audio_url: getSignedUrl(recording.audioFileUrl),
+    duration_seconds: recording.durationSeconds,
+    transcription: recording.transcription,
+    recorded_at: recording.recordedAt,
   };
 }

@@ -75,6 +75,7 @@ enum APIEndpoint {
     case recording(id: String)
     case deleteRecording(id: String)
     case transcribeRecording(id: String)
+    case uploadAuthenticatedRecording(journalId: String, questionId: String)
 
     // Notifications
     case notifications
@@ -158,6 +159,8 @@ enum APIEndpoint {
             return "/recordings/\(id)"
         case .transcribeRecording(let id):
             return "/recordings/\(id)/transcribe"
+        case .uploadAuthenticatedRecording(let journalId, let questionId):
+            return "/journals/\(journalId)/questions/\(questionId)/recordings"
 
         // Notifications
         case .notifications: return "/notifications"
@@ -188,7 +191,7 @@ enum APIEndpoint {
              .createPerson, .uploadPersonPhoto,
              .createQuestion, .bulkCreateQuestions, .assignQuestion,
              .sendAssignment, .remindAssignment,
-             .uploadRecording, .transcribeRecording,
+             .uploadRecording, .uploadAuthenticatedRecording, .transcribeRecording,
              .markAllNotificationsRead:
             return .post
 

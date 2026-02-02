@@ -6,7 +6,7 @@ import templatesRoutes from './templates.routes.js';
 import journalsRoutes from './journals.routes.js';
 import questionsRoutes, { journalQuestionsRouter } from './questions.routes.js';
 import assignmentsRoutes from './assignments.routes.js';
-import recordingsRoutes from './recordings.routes.js';
+import recordingsRoutes, { recordPublicRouter } from './recordings.routes.js';
 import notificationsRoutes from './notifications.routes.js';
 import statsRoutes from './stats.routes.js';
 
@@ -21,7 +21,7 @@ router.use('/journals/:journal_id/questions', journalQuestionsRouter);
 router.use('/questions', questionsRoutes);
 router.use('/assignments', assignmentsRoutes);
 router.use('/recordings', recordingsRoutes);
-router.use('/record', recordingsRoutes); // Public recording routes
+router.use('/record', recordPublicRouter); // Public recording routes
 router.use('/notifications', notificationsRoutes);
 router.use('/stats', statsRoutes);
 

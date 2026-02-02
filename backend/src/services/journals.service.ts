@@ -24,6 +24,7 @@ export interface JournalSummary {
     name: string;
     relationship: string;
     profile_photo_url: string | null;
+    linked_user_id: string | null;
   } | null;
   is_owner: boolean;
   question_count: number;
@@ -135,6 +136,7 @@ export async function listJournals(userId: string, query: JournalQueryInput): Pr
         name: journal.dedicatedToPerson.name,
         relationship: journal.dedicatedToPerson.relationship,
         profile_photo_url: journal.dedicatedToPerson.profilePhotoUrl,
+        linked_user_id: journal.dedicatedToPerson.linkedUserId,
       } : null,
       is_owner: journal.ownerId === userId,
       question_count: journal.questions.length,
@@ -181,6 +183,7 @@ export async function createJournal(userId: string, input: CreateJournalInput): 
       name: journal.dedicatedToPerson.name,
       relationship: journal.dedicatedToPerson.relationship,
       profile_photo_url: journal.dedicatedToPerson.profilePhotoUrl,
+      linked_user_id: journal.dedicatedToPerson.linkedUserId,
     } : null,
     is_owner: true,
     question_count: 0,
@@ -265,6 +268,7 @@ export async function getJournal(userId: string, journalId: string): Promise<Jou
       name: journal.dedicatedToPerson.name,
       relationship: journal.dedicatedToPerson.relationship,
       profile_photo_url: journal.dedicatedToPerson.profilePhotoUrl,
+      linked_user_id: journal.dedicatedToPerson.linkedUserId,
     } : null,
     is_owner: isOwner,
     question_count: journal.questions.length,

@@ -68,12 +68,20 @@ class APIClient {
         fileName: String,
         mimeType: String,
         fieldName: String,
-        additionalFields: [String: String]? = nil
+        additionalFields: [String: String]? = nil,
+        additionalHeaders: [String: String]? = nil
     ) async throws -> T {
         let boundary = UUID().uuidString
 
         var request = try await buildBaseRequest(endpoint)
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+
+        // Add additional headers (e.g., idempotency key)
+        if let headers = additionalHeaders {
+            for (key, value) in headers {
+                request.setValue(value, forHTTPHeaderField: key)
+            }
+        }
 
         var body = Data()
 

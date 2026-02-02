@@ -17,8 +17,8 @@ struct RecordingPlayerView: View {
 
         NavigationStack {
             ZStack {
-                colors.background
-                    .ignoresSafeArea()
+                // Use app background for consistent aesthetic
+                AppBackground()
 
                 VStack(spacing: Theme.Spacing.xl) {
                     Spacer()
@@ -28,72 +28,75 @@ struct RecordingPlayerView: View {
                         VStack(spacing: Theme.Spacing.md) {
                             AvatarView(
                                 name: person.name,
-                                size: 96,
+                                size: 120,
                                 colors: colors
                             )
 
                             Text(person.name)
-                                .font(AppTypography.headlineMedium)
-                                .foregroundColor(colors.textPrimary)
+                                .font(AppTypography.headlineLarge)
+                                .foregroundColor(.white)
                         }
                     }
 
-                    // Question
+                    // Question - prominent white bold text
                     if let question = recording.question {
-                        Text(question.questionText)
-                            .font(AppTypography.bodyLarge)
-                            .foregroundColor(colors.textSecondary)
+                        Text("\"\(question.questionText)\"")
+                            .font(.system(size: 22, weight: .semibold))
+                            .foregroundColor(.white)
                             .multilineTextAlignment(.center)
                             .padding(.horizontal, Theme.Spacing.xl)
+                            .padding(.top, Theme.Spacing.md)
                     }
 
                     Spacer()
 
-                    // Waveform placeholder
+                    // Waveform visualization
                     StaticWaveformView(
                         progress: duration > 0 ? currentTime / duration : 0,
                         colors: colors
                     )
-                    .frame(height: 60)
-                    .padding(.horizontal, Theme.Spacing.xl)
+                    .frame(height: 70)
+                    .padding(.horizontal, Theme.Spacing.lg)
 
                     // Time display
                     HStack {
                         Text(formatTime(currentTime))
                             .font(AppTypography.labelMedium)
-                            .foregroundColor(colors.textSecondary)
+                            .foregroundColor(.white.opacity(0.7))
 
                         Spacer()
 
                         Text(formatTime(duration))
                             .font(AppTypography.labelMedium)
-                            .foregroundColor(colors.textSecondary)
+                            .foregroundColor(.white.opacity(0.7))
                     }
                     .padding(.horizontal, Theme.Spacing.xl)
 
                     // Playback controls
-                    HStack(spacing: Theme.Spacing.xl) {
+                    HStack(spacing: Theme.Spacing.xxl) {
                         // Rewind 15s
                         Button(action: rewind) {
                             Image(systemName: "gobackward.15")
-                                .font(.system(size: 28))
-                                .foregroundColor(colors.textSecondary)
+                                .font(.system(size: 32))
+                                .foregroundColor(.white.opacity(0.8))
                         }
 
                         // Play/Pause
                         Button(action: togglePlayback) {
                             if isLoading {
                                 ProgressView()
-                                    .frame(width: 72, height: 72)
+                                    .tint(.white)
+                                    .frame(width: 80, height: 80)
                             } else {
                                 Circle()
                                     .fill(colors.accentPrimary)
-                                    .frame(width: 72, height: 72)
+                                    .frame(width: 80, height: 80)
+                                    .shadow(color: colors.accentPrimary.opacity(0.4), radius: 12, x: 0, y: 4)
                                     .overlay(
                                         Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                                            .font(.system(size: 28))
+                                            .font(.system(size: 32))
                                             .foregroundColor(.white)
-                                            .offset(x: isPlaying ? 0 : 2)
+                                            .offset(x: isPlaying ? 0 : 3)
                                     )
                             }
                         }
@@ -102,37 +105,53 @@ struct RecordingPlayerView: View {
                         // Forward 15s
                         Button(action: forward) {
                             Image(systemName: "goforward.15")
-                                .font(.system(size: 28))
-                                .foregroundColor(colors.textSecondary)
+                                .font(.system(size: 32))
+                                .foregroundColor(.white.opacity(0.8))
                         }
                     }
-                    .padding(.vertical, Theme.Spacing.lg)
+                    .padding(.vertical, Theme.Spacing.xl)
 
                     // Transcription
                     if let transcription = recording.transcription, !transcription.isEmpty {
-                        ScrollView {
-                            Text(transcription)
-                                .font(AppTypography.bodyMedium)
-                                .foregroundColor(colors.textPrimary)
-                                .padding(Theme.Spacing.md)
+                        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                            Text("Transcription")
+                                .font(AppTypography.labelMedium)
+                                .foregroundColor(.white.opacity(0.6))
+
+                            ScrollView {
+                                Text(transcription)
+                                    .font(AppTypography.bodyMedium)
+                                    .foregroundColor(.white.opacity(0.9))
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(Theme.Spacing.md)
+                            }
+                            .frame(maxHeight: 150)
+                            .background(Color.white.opacity(0.1))
+                            .cornerRadius(Theme.Radius.md)
                         }
-                        .frame(maxHeight: 150)
-                        .background(colors.surface)
-                        .cornerRadius(Theme.Radius.md)
                         .padding(.horizontal, Theme.Spacing.lg)
                     }
 
                     Spacer()
                 }
             }
-            .navigationTitle("Recording")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button(action: { dismiss() }) {
                         Image(systemName: "xmark")
-                            .foregroundColor(colors.textSecondary)
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.white.opacity(0.8))
+                            .padding(10)
+                            .background(Color.white.opacity(0.15))
+                            .clipShape(Circle())
                     }
+                }
+
+                ToolbarItem(placement: .principal) {
+                    Text("Recording")
+                        .font(AppTypography.headlineSmall)
+                        .foregroundColor(.white)
                 }
             }
         }
@@ -152,22 +171,39 @@ struct RecordingPlayerView: View {
     }
 
     private func loadAudio() async {
+        print("🔊 Loading audio from URL: \(recording.audioUrl)")
+
         guard let url = URL(string: recording.audioUrl) else {
+            print("🔊 ERROR: Invalid URL!")
             isLoading = false
             return
         }
 
+        print("🔊 Created URL object: \(url)")
+
         await MainActor.run {
             player = AVPlayer(url: url)
+            print("🔊 Created AVPlayer")
 
             // Observe duration
             player?.currentItem?.asset.loadValuesAsynchronously(forKeys: ["duration"]) {
                 Task { @MainActor in
                     if let item = player?.currentItem {
-                        duration = item.asset.duration.seconds
+                        let assetDuration = item.asset.duration
+                        duration = assetDuration.seconds
+                        print("🔊 Asset duration: \(assetDuration.seconds) seconds, isValid: \(!assetDuration.seconds.isNaN)")
                     }
                     isLoading = false
                 }
+            }
+
+            // Also observe player errors
+            NotificationCenter.default.addObserver(
+                forName: .AVPlayerItemFailedToPlayToEndTime,
+                object: player?.currentItem,
+                queue: .main
+            ) { notification in
+                print("🔊 Player failed: \(notification)")
             }
 
             // Observe time

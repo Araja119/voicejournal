@@ -4,6 +4,7 @@ import PhotosUI
 struct CreateJournalSheet: View {
     @Environment(\.colorScheme) var colorScheme
     @Environment(\.dismiss) var dismiss
+    @EnvironmentObject var appState: AppState
 
     @StateObject private var peopleViewModel = PeopleViewModel()
 
@@ -52,7 +53,7 @@ struct CreateJournalSheet: View {
                                     HStack {
                                         if let person = selectedPerson {
                                             AvatarView(name: person.name, imageURL: person.profilePhotoUrl, size: 28, colors: colors)
-                                            Text(person.name)
+                                            Text(person.isSelf ? "Myself" : person.name)
                                                 .foregroundColor(colors.textPrimary)
                                         } else {
                                             Image(systemName: "person.crop.circle")
@@ -73,6 +74,38 @@ struct CreateJournalSheet: View {
 
                                 // Expandable options
                                 if isPersonPickerExpanded {
+                                    // Myself option (first, with special styling)
+                                    if let myself = peopleViewModel.myselfPerson {
+                                        Divider()
+                                            .background(colors.background)
+
+                                        Button(action: {
+                                            selectedPerson = myself
+                                            withAnimation { isPersonPickerExpanded = false }
+                                        }) {
+                                            HStack {
+                                                AvatarView(name: myself.name, imageURL: myself.profilePhotoUrl, size: 28, colors: colors)
+                                                VStack(alignment: .leading, spacing: 0) {
+                                                    Text("Myself")
+                                                        .foregroundColor(colors.textPrimary)
+                                                    Text("Record your own stories")
+                                                        .font(AppTypography.caption)
+                                                        .foregroundColor(colors.textSecondary)
+                                                }
+                                                Spacer()
+                                                if selectedPerson?.id == myself.id {
+                                                    Image(systemName: "checkmark")
+                                                        .font(.system(size: 14, weight: .semibold))
+                                                        .foregroundColor(colors.accentPrimary)
+                                                }
+                                            }
+                                            .font(AppTypography.bodyMedium)
+                                            .padding(.horizontal, Theme.Spacing.md)
+                                            .padding(.vertical, Theme.Spacing.sm)
+                                            .background(colors.accentPrimary.opacity(0.05))
+                                        }
+                                    }
+
                                     Divider()
                                         .background(colors.background)
 
@@ -100,7 +133,7 @@ struct CreateJournalSheet: View {
                                         .padding(.vertical, Theme.Spacing.sm)
                                     }
 
-                                    // People list
+                                    // People list (excluding myself)
                                     ForEach(peopleViewModel.people) { person in
                                         Divider()
                                             .background(colors.background)
@@ -228,7 +261,13 @@ struct CreateJournalSheet: View {
             }
         }
         .task {
+            // Load people first
             await peopleViewModel.loadPeople()
+
+            // If no "myself" person from database, create synthetic one from current user
+            if peopleViewModel.myselfPerson == nil, let user = appState.currentUser {
+                peopleViewModel.createSyntheticMyself(from: user)
+            }
         }
         .sheet(isPresented: $showingAddPerson) {
             QuickAddPersonSheet { newPerson in
@@ -265,11 +304,20 @@ struct CreateJournalSheet: View {
 
         Task {
             do {
+                var dedicatedPersonId = selectedPerson?.id
+
+                // If this is a synthetic "myself" person, create a real one first
+                if let person = selectedPerson, person.id.hasPrefix("myself-"), let user = appState.currentUser {
+                    if let realMyself = await peopleViewModel.ensureRealMyselfExists(user: user) {
+                        dedicatedPersonId = realMyself.id
+                    }
+                }
+
                 let request = CreateJournalRequest(
                     title: title,
                     description: description.isEmpty ? nil : description,
                     privacySetting: privacySetting,
-                    dedicatedToPersonId: selectedPerson?.id
+                    dedicatedToPersonId: dedicatedPersonId
                 )
                 let journal = try await JournalService.shared.createJournal(request)
                 onCreate(journal)
@@ -363,7 +411,8 @@ struct QuickAddPersonSheet: View {
                                 .foregroundColor(colors.textSecondary)
 
                             Menu {
-                                ForEach(RelationshipType.allTypes, id: \.self) { type in
+                                // Filter out "self" - only system can create that
+                                ForEach(RelationshipType.allTypes.filter { $0 != "self" }, id: \.self) { type in
                                     Button(action: { relationship = type }) {
                                         HStack {
                                             Text(RelationshipType.displayName(for: type))

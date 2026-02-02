@@ -83,7 +83,8 @@ struct AddPersonSheet: View {
                                 .foregroundColor(colors.textSecondary)
 
                             Menu {
-                                ForEach(RelationshipType.allTypes, id: \.self) { type in
+                                // Filter out "self" - only system can create that
+                                ForEach(RelationshipType.allTypes.filter { $0 != "self" }, id: \.self) { type in
                                     Button(action: { relationship = type }) {
                                         HStack {
                                             Text(RelationshipType.displayName(for: type))

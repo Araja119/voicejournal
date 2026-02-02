@@ -67,7 +67,7 @@ export async function listPeople(userId: string): Promise<PersonSummary[]> {
   }));
 }
 
-export async function createPerson(userId: string, input: CreatePersonInput): Promise<PersonSummary> {
+export async function createPerson(userId: string, input: CreatePersonInput & { linked_user_id?: string }): Promise<PersonSummary> {
   const person = await prisma.person.create({
     data: {
       ownerId: userId,
@@ -75,6 +75,7 @@ export async function createPerson(userId: string, input: CreatePersonInput): Pr
       relationship: input.relationship,
       email: input.email || null,
       phoneNumber: input.phone_number || null,
+      linkedUserId: input.linked_user_id || null,
     },
   });
 

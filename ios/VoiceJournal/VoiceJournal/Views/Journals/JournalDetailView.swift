@@ -16,6 +16,28 @@ struct JournalDetailView: View {
     @State private var isLoadingAISuggestions = false
     @State private var currentSuggestionIndex = 0
 
+    // Question deletion state
+    @State private var questionToDelete: Question?
+    @State private var showingQuestionDeleteConfirmation = false
+    @State private var isDeletingQuestion = false
+
+    // Question editing state
+    @State private var questionToEdit: Question?
+    @State private var showingEditQuestion = false
+    @State private var editedQuestionText = ""
+
+
+    // Recording state (for self-journals)
+    @State private var showingRecordingModal = false
+    @State private var recordingQuestion: Question?
+    @State private var recordingIdempotencyKey: String?
+    @State private var isUploadingRecording = false
+    @State private var uploadError: String?
+
+    // Playback state
+    @State private var playbackRecording: Recording?
+    @State private var debugMessage: String?
+
     // Fallback questions if AI fetch fails
     private let fallbackQuestions: [SuggestedQuestion] = [
         SuggestedQuestion(question: "What's one childhood memory that still makes you smile?", category: "memories"),
@@ -91,9 +113,82 @@ struct JournalDetailView: View {
         } message: {
             Text("This will permanently delete the journal and all its questions. This action cannot be undone.")
         }
+        .confirmationDialog(
+            "Delete this question?",
+            isPresented: $showingQuestionDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) {
+                deleteQuestion()
+            }
+            Button("Cancel", role: .cancel) {
+                questionToDelete = nil
+            }
+        } message: {
+            Text("This action cannot be undone.")
+        }
         .sheet(isPresented: $showingAddQuestion) {
             CreateQuestionSheet(journalId: journalId) {
                 Task { await viewModel.loadJournal(id: journalId) }
+            }
+        }
+        .sheet(isPresented: $showingEditQuestion) {
+            EditQuestionSheet(
+                questionText: $editedQuestionText,
+                onSave: {
+                    saveEditedQuestion()
+                },
+                onCancel: {
+                    showingEditQuestion = false
+                    questionToEdit = nil
+                }
+            )
+        }
+        .fullScreenCover(item: $recordingQuestion) { question in
+            RecordingModal(
+                questionText: question.questionText,
+                onComplete: { audioData, duration in
+                    let questionToUpload = question
+                    recordingQuestion = nil
+                    Task {
+                        await uploadSelfRecording(
+                            question: questionToUpload,
+                            audioData: audioData,
+                            duration: duration
+                        )
+                    }
+                },
+                onCancel: {
+                    recordingQuestion = nil
+                    recordingIdempotencyKey = nil
+                }
+            )
+        }
+        .fullScreenCover(item: $playbackRecording) { recording in
+            RecordingPlayerView(recording: recording)
+        }
+        .alert("Upload Failed", isPresented: .init(
+            get: { uploadError != nil },
+            set: { if !$0 { uploadError = nil } }
+        )) {
+            Button("OK", role: .cancel) {
+                uploadError = nil
+            }
+        } message: {
+            if let error = uploadError {
+                Text(error)
+            }
+        }
+        .alert("Debug", isPresented: .init(
+            get: { debugMessage != nil },
+            set: { if !$0 { debugMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) {
+                debugMessage = nil
+            }
+        } message: {
+            if let msg = debugMessage {
+                Text(msg)
             }
         }
         .task {
@@ -114,6 +209,105 @@ struct JournalDetailView: View {
             }
             isDeleting = false
         }
+    }
+
+    private func deleteQuestion() {
+        guard let question = questionToDelete else { return }
+        isDeletingQuestion = true
+
+        Task {
+            do {
+                print("🗑️ Deleting question: \(question.id) from journal: \(journalId)")
+                try await QuestionService.shared.deleteQuestion(journalId: journalId, questionId: question.id)
+                print("🗑️ Delete successful, reloading journal")
+                await viewModel.loadJournal(id: journalId)
+            } catch {
+                print("🗑️ Failed to delete question: \(error)")
+            }
+            questionToDelete = nil
+            isDeletingQuestion = false
+        }
+    }
+
+    private func saveEditedQuestion() {
+        guard let question = questionToEdit else { return }
+        let trimmedText = editedQuestionText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedText.isEmpty else { return }
+
+        Task {
+            do {
+                print("✏️ Updating question: \(question.id)")
+                let request = UpdateQuestionRequest(questionText: trimmedText)
+                _ = try await QuestionService.shared.updateQuestion(
+                    journalId: journalId,
+                    questionId: question.id,
+                    request
+                )
+                print("✏️ Update successful, reloading journal")
+                await viewModel.loadJournal(id: journalId)
+            } catch {
+                print("✏️ Failed to update question: \(error)")
+            }
+            showingEditQuestion = false
+            questionToEdit = nil
+            editedQuestionText = ""
+        }
+    }
+
+    // MARK: - Recording Functions
+
+    private func startRecording(for question: Question) {
+        recordingIdempotencyKey = UUID().uuidString
+        recordingQuestion = question  // This triggers the fullScreenCover
+    }
+
+    private func playRecording(for assignment: Assignment) {
+        // Fetch the full recording when play button is tapped
+        guard let assignmentRecording = assignment.recording else {
+            debugMessage = "No recording found in assignment! Status: \(assignment.status.rawValue)"
+            return
+        }
+
+        Task {
+            do {
+                let fullRecording = try await RecordingService.shared.getRecording(id: assignmentRecording.id)
+                await MainActor.run {
+                    playbackRecording = fullRecording
+                }
+            } catch {
+                await MainActor.run {
+                    debugMessage = "API Failed: \(error.localizedDescription)"
+                }
+            }
+        }
+    }
+
+    @MainActor
+    private func uploadSelfRecording(question: Question, audioData: Data, duration: Int) async {
+        guard let idempotencyKey = recordingIdempotencyKey else { return }
+
+        isUploadingRecording = true
+
+        do {
+            let _ = try await RecordingService.shared.uploadRecordingAuthenticated(
+                journalId: journalId,
+                questionId: question.id,
+                audioData: audioData,
+                durationSeconds: duration,
+                idempotencyKey: idempotencyKey
+            )
+
+            // Refresh journal to get updated question state
+            await viewModel.loadJournal(id: journalId)
+
+            recordingQuestion = nil
+            recordingIdempotencyKey = nil
+        } catch {
+            print("🎙️ Upload failed: \(error)")
+            uploadError = "Failed to save recording. Please try again."
+        }
+
+        isUploadingRecording = false
     }
 
     private func addSuggestedQuestion() {
@@ -171,57 +365,58 @@ struct JournalDetailView: View {
     // MARK: - Hero Header
     @ViewBuilder
     private func heroHeader(journal: Journal, colors: AppColors) -> some View {
-        VStack(spacing: Theme.Spacing.md) {
-            // Abstract visual header
-            ZStack {
-                // Gradient background
-                RoundedRectangle(cornerRadius: Theme.Radius.lg)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                colors.accentPrimary.opacity(0.3),
-                                colors.accentSecondary.opacity(0.2)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            // Person avatar if dedicated
+            if let person = journal.dedicatedToPerson {
+                // Check if this is a self-journal (relationship "self" or linked to owner)
+                let isMyJournal = person.isSelf || (journal.isOwner && person.linkedUserId == journal.owner.id)
+
+                HStack(spacing: Theme.Spacing.sm) {
+                    AvatarView(
+                        name: person.name,
+                        imageURL: person.profilePhotoUrl,
+                        size: 40,
+                        colors: colors
                     )
-                    .frame(height: 140)
-
-                // Content
-                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                    // Person avatar if dedicated
-                    if let person = journal.dedicatedToPerson {
-                        HStack(spacing: Theme.Spacing.sm) {
-                            AvatarView(
-                                name: person.name,
-                                imageURL: person.profilePhotoUrl,
-                                size: 40,
-                                colors: colors
-                            )
-                            Text("For \(person.name)")
-                                .font(AppTypography.labelMedium)
-                                .foregroundColor(colors.textPrimary.opacity(0.8))
-                        }
-                    }
-
-                    Text(journal.title)
-                        .font(AppTypography.headlineLarge)
-                        .foregroundColor(colors.textPrimary)
-                        .lineLimit(2)
-
-                    if let description = journal.description, !description.isEmpty {
-                        Text(description)
-                            .font(AppTypography.bodyMedium)
-                            .foregroundColor(colors.textSecondary.opacity(0.8))
-                            .italic()
-                            .lineLimit(2)
+                    if isMyJournal {
+                        Text("My Journal")
+                            .font(AppTypography.labelMedium)
+                            .foregroundColor(colors.textPrimary)
+                    } else {
+                        Text("For \(person.name)")
+                            .font(AppTypography.labelMedium)
+                            .foregroundColor(colors.textPrimary)
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(Theme.Spacing.lg)
+            }
+
+            Text(journal.title)
+                .font(AppTypography.headlineLarge)
+                .foregroundColor(colors.textPrimary)
+                .lineLimit(2)
+
+            if let description = journal.description, !description.isEmpty {
+                Text(description)
+                    .font(AppTypography.bodyMedium)
+                    .foregroundColor(colors.textSecondary.opacity(0.70))
+                    .italic()
+                    .lineLimit(2)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(Theme.Spacing.lg)
+        .background(
+            ZStack {
+                RoundedRectangle(cornerRadius: Theme.Radius.lg)
+                    .fill(.regularMaterial)
+                RoundedRectangle(cornerRadius: Theme.Radius.lg)
+                    .fill(Color.black.opacity(0.25))
+            }
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.Radius.lg)
+                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+        )
     }
 
     // MARK: - Progress Status
@@ -463,6 +658,11 @@ struct JournalDetailView: View {
     @ViewBuilder
     private func journalTimeline(questions: [Question], journal: Journal, colors: AppColors) -> some View {
         let recipientName = journal.dedicatedToPerson?.name
+        // A self-journal is when:
+        // 1. The dedicated person has relationship "self", OR
+        // 2. The dedicated person is linked to the journal owner (same user ID)
+        let isSelfJournal = journal.dedicatedToPerson?.isSelf == true ||
+            (journal.isOwner && journal.dedicatedToPerson?.linkedUserId == journal.owner.id)
 
         // Track if we've seen the first draft (for CTA prominence)
         let questionStates = questions.map { getQuestionState($0) }
@@ -497,7 +697,29 @@ struct JournalDetailView: View {
                         recipientName: recipientName,
                         state: questionState,
                         isFirstDraft: isFirstDraft,
-                        colors: colors
+                        isSelfJournal: isSelfJournal,
+                        colors: colors,
+                        onEditTapped: {
+                            questionToEdit = question
+                            editedQuestionText = question.questionText
+                            showingEditQuestion = true
+                        },
+                        onDeleteTapped: {
+                            questionToDelete = question
+                            showingQuestionDeleteConfirmation = true
+                        },
+                        onCopyLinkTapped: {
+                            // TODO: Copy link
+                        },
+                        onResendTapped: {
+                            // TODO: Resend
+                        },
+                        onRecordTapped: {
+                            startRecording(for: question)
+                        },
+                        onPlayTapped: { assignment in
+                            playRecording(for: assignment)
+                        }
                     )
                     .padding(.bottom, Theme.Spacing.md)
                 }
@@ -569,11 +791,20 @@ struct QuestionTimelineCard: View {
     let recipientName: String?
     let state: QuestionState
     let isFirstDraft: Bool
+    let isSelfJournal: Bool
     let colors: AppColors
+
+    // Callbacks for actions
+    var onEditTapped: () -> Void = {}
+    var onDeleteTapped: () -> Void = {}
+    var onCopyLinkTapped: () -> Void = {}
+    var onResendTapped: () -> Void = {}
+    var onRecordTapped: () -> Void = {}
+    var onPlayTapped: ((Assignment) -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-            // Header row with question text and overflow menu
+            // Header row with question text and menu button
             HStack(alignment: .top) {
                 Text(question.questionText)
                     .font(AppTypography.bodyLarge)
@@ -581,52 +812,32 @@ struct QuestionTimelineCard: View {
 
                 Spacer()
 
-                // Overflow menu - scoped by state
+                // Menu appears directly under the ellipsis button
                 Menu {
-                    // Draft actions
                     if state == .draft {
-                        Button(action: {
-                            // TODO: Edit question
-                        }) {
+                        Button(action: onEditTapped) {
                             Label("Edit Question", systemImage: "pencil")
                         }
-
-                        Divider()
-
-                        Button(role: .destructive, action: {
-                            // TODO: Delete draft
-                        }) {
+                        Button(role: .destructive, action: onDeleteTapped) {
                             Label("Delete Draft", systemImage: "trash")
                         }
-                    }
-
-                    // Sent/Awaiting/Answered actions
-                    if state != .draft {
-                        Button(action: {
-                            // TODO: Copy link
-                        }) {
+                    } else {
+                        Button(action: onCopyLinkTapped) {
                             Label("Copy Link", systemImage: "link")
                         }
-
-                        Button(action: {
-                            // TODO: Resend
-                        }) {
+                        Button(action: onResendTapped) {
                             Label("Resend", systemImage: "arrow.clockwise")
                         }
-
-                        Divider()
-
-                        Button(role: .destructive, action: {
-                            // TODO: Delete question
-                        }) {
+                        Button(role: .destructive, action: onDeleteTapped) {
                             Label("Delete", systemImage: "trash")
                         }
                     }
                 } label: {
                     Image(systemName: "ellipsis")
-                        .font(.system(size: 14))
+                        .font(.system(size: 16, weight: .medium))
                         .foregroundColor(colors.textSecondary)
-                        .frame(width: 28, height: 28)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
             }
 
@@ -642,23 +853,35 @@ struct QuestionTimelineCard: View {
         }
         .padding(Theme.Spacing.md)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(cardBackground)
+        .background(
+            ZStack {
+                // Backdrop blur
+                RoundedRectangle(cornerRadius: Theme.Radius.md)
+                    .fill(.ultraThinMaterial)
+                // Dark overlay
+                RoundedRectangle(cornerRadius: Theme.Radius.md)
+                    .fill(cardBackground)
+            }
+        )
         .cornerRadius(Theme.Radius.md)
+        // Border: 1px solid rgba(255, 255, 255, 0.05)
         .overlay(
             RoundedRectangle(cornerRadius: Theme.Radius.md)
-                .stroke(state == .answered ? colors.accentPrimary.opacity(0.3) : Color.clear, lineWidth: 1)
+                .stroke(state == .answered ? colors.accentPrimary.opacity(0.25) : Color.white.opacity(0.05), lineWidth: 1)
         )
     }
 
     // MARK: - State-Based Background
+    // Using rgba(24, 26, 32) with varying opacity for timeline cards
     private var cardBackground: Color {
+        let baseColor = Color(red: 24/255, green: 26/255, blue: 32/255)
         switch state {
         case .draft:
-            return colors.surface
+            return baseColor.opacity(0.72)
         case .awaiting:
-            return colors.surface.opacity(0.8)
+            return baseColor.opacity(0.68)
         case .answered:
-            return colors.surface.opacity(0.9)
+            return baseColor.opacity(0.75)
         }
     }
 
@@ -666,45 +889,75 @@ struct QuestionTimelineCard: View {
     @ViewBuilder
     private var draftContent: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-            // Status label
-            Text("Draft")
-                .font(AppTypography.caption)
-                .foregroundColor(colors.textSecondary)
-                .padding(.horizontal, Theme.Spacing.sm)
-                .padding(.vertical, Theme.Spacing.xxs)
-                .background(colors.textSecondary.opacity(0.15))
-                .cornerRadius(Theme.Radius.sm)
+            // Status label - only show for non-self journals
+            if !isSelfJournal {
+                Text("Draft")
+                    .font(AppTypography.caption)
+                    .foregroundColor(colors.textSecondary)
+                    .padding(.horizontal, Theme.Spacing.sm)
+                    .padding(.vertical, Theme.Spacing.xxs)
+                    .background(colors.textSecondary.opacity(0.15))
+                    .cornerRadius(Theme.Radius.sm)
+            }
 
-            // CTA - full button for first draft, text link for subsequent
-            if isFirstDraft {
-                // Primary CTA button
-                Button(action: {
-                    // TODO: Open send flow
-                }) {
-                    HStack(spacing: Theme.Spacing.xs) {
-                        Image(systemName: "paperplane.fill")
-                            .font(.system(size: 12))
-                        Text(recipientName != nil ? "Send to \(recipientName!)" : "Send Question")
+            // CTA - different for self-journals vs regular journals
+            if isSelfJournal {
+                // Self-journal: "Record Answer" button (purple accent)
+                if isFirstDraft {
+                    Button(action: onRecordTapped) {
+                        HStack(spacing: Theme.Spacing.xs) {
+                            Image(systemName: "mic.fill")
+                                .font(.system(size: 12))
+                            Text("Record Answer")
+                        }
+                        .font(AppTypography.labelMedium)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, Theme.Spacing.md)
+                        .padding(.vertical, Theme.Spacing.sm)
+                        .background(colors.accentRecord)
+                        .cornerRadius(Theme.Radius.md)
                     }
-                    .font(AppTypography.labelMedium)
-                    .foregroundColor(.white)
-                    .padding(.horizontal, Theme.Spacing.md)
-                    .padding(.vertical, Theme.Spacing.sm)
-                    .background(colors.accentPrimary)
-                    .cornerRadius(Theme.Radius.md)
+                } else {
+                    Button(action: onRecordTapped) {
+                        HStack(spacing: Theme.Spacing.xxs) {
+                            Image(systemName: "mic")
+                                .font(.system(size: 11))
+                            Text("Record")
+                        }
+                        .font(AppTypography.caption)
+                        .foregroundColor(colors.accentRecord)
+                    }
                 }
             } else {
-                // Smaller text button for subsequent drafts
-                Button(action: {
-                    // TODO: Open send flow
-                }) {
-                    HStack(spacing: Theme.Spacing.xxs) {
-                        Image(systemName: "paperplane")
-                            .font(.system(size: 11))
-                        Text("Send")
+                // Regular journal: "Send to [Name]" button
+                if isFirstDraft {
+                    Button(action: {
+                        // TODO: Open send flow
+                    }) {
+                        HStack(spacing: Theme.Spacing.xs) {
+                            Image(systemName: "paperplane.fill")
+                                .font(.system(size: 12))
+                            Text(recipientName != nil ? "Send to \(recipientName!)" : "Send Question")
+                        }
+                        .font(AppTypography.labelMedium)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, Theme.Spacing.md)
+                        .padding(.vertical, Theme.Spacing.sm)
+                        .background(colors.accentPrimary)
+                        .cornerRadius(Theme.Radius.md)
                     }
-                    .font(AppTypography.caption)
-                    .foregroundColor(colors.accentPrimary)
+                } else {
+                    Button(action: {
+                        // TODO: Open send flow
+                    }) {
+                        HStack(spacing: Theme.Spacing.xxs) {
+                            Image(systemName: "paperplane")
+                                .font(.system(size: 11))
+                            Text("Send")
+                        }
+                        .font(AppTypography.caption)
+                        .foregroundColor(colors.accentPrimary)
+                    }
                 }
             }
         }
@@ -801,7 +1054,7 @@ struct QuestionTimelineCard: View {
                                     Text("Answered")
                                         .font(AppTypography.caption)
                                 }
-                                .foregroundColor(colors.accentPrimary)
+                                .foregroundColor(.green)
                             } else {
                                 awaitingStatusChip(for: assignment.status)
                             }
@@ -812,9 +1065,10 @@ struct QuestionTimelineCard: View {
 
                     // Play button if answered
                     if assignment.status == .answered {
-                        Button(action: {
-                            // TODO: Play recording
-                        }) {
+                        Button {
+                            NSLog("🎙️ Play button TAPPED for assignment: %@", assignment.id)
+                            onPlayTapped?(assignment)
+                        } label: {
                             HStack(spacing: Theme.Spacing.xs) {
                                 Image(systemName: "play.fill")
                                     .font(.system(size: 12))
@@ -827,6 +1081,7 @@ struct QuestionTimelineCard: View {
                             .background(colors.accentPrimary)
                             .cornerRadius(Theme.Radius.md)
                         }
+                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -881,6 +1136,68 @@ struct QuestionCard: View {
             }
         }
         .padding(.top, Theme.Spacing.xs)
+    }
+}
+
+// MARK: - Edit Question Sheet
+struct EditQuestionSheet: View {
+    @Binding var questionText: String
+    let onSave: () -> Void
+    let onCancel: () -> Void
+
+    @Environment(\.colorScheme) var colorScheme
+    @FocusState private var isTextFieldFocused: Bool
+
+    var body: some View {
+        let colors = AppColors(colorScheme)
+
+        NavigationStack {
+            ZStack {
+                colors.background.ignoresSafeArea()
+
+                VStack(spacing: Theme.Spacing.lg) {
+                    Text("Edit your question")
+                        .font(AppTypography.bodyMedium)
+                        .foregroundColor(colors.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    TextEditor(text: $questionText)
+                        .font(AppTypography.bodyLarge)
+                        .foregroundColor(colors.textPrimary)
+                        .scrollContentBackground(.hidden)
+                        .padding(Theme.Spacing.md)
+                        .background(colors.surface)
+                        .cornerRadius(Theme.Radius.md)
+                        .frame(minHeight: 120)
+                        .focused($isTextFieldFocused)
+
+                    Spacer()
+                }
+                .padding(Theme.Spacing.lg)
+            }
+            .navigationTitle("Edit Question")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        onCancel()
+                    }
+                    .foregroundColor(colors.textSecondary)
+                }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        onSave()
+                    }
+                    .fontWeight(.semibold)
+                    .foregroundColor(colors.accentPrimary)
+                    .disabled(questionText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+            .onAppear {
+                isTextFieldFocused = true
+            }
+        }
     }
 }
 

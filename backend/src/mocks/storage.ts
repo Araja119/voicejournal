@@ -86,10 +86,23 @@ export async function deleteFile(key: string): Promise<void> {
   }
 }
 
-export function getSignedUrl(key: string, _expiresInSeconds: number = 3600): string {
+export function getSignedUrl(keyOrUrl: string, _expiresInSeconds: number = 3600): string {
   // In production, this would return a signed URL from S3/R2
   // For mock, just return the direct URL with a fake signature
-  return `${process.env.APP_URL}/uploads/${key}?sig=mock&exp=${Date.now() + _expiresInSeconds * 1000}`;
+
+  // If it's already a full URL, extract the path
+  const appUrl = process.env.APP_URL || 'http://localhost:3000';
+  let key = keyOrUrl;
+
+  if (keyOrUrl.startsWith('http://') || keyOrUrl.startsWith('https://')) {
+    // Extract the path after /uploads/
+    const uploadsIndex = keyOrUrl.indexOf('/uploads/');
+    if (uploadsIndex !== -1) {
+      key = keyOrUrl.substring(uploadsIndex + '/uploads/'.length);
+    }
+  }
+
+  return `${appUrl}/uploads/${key}?sig=mock&exp=${Date.now() + _expiresInSeconds * 1000}`;
 }
 
 function getExtensionFromContentType(contentType: string): string {

@@ -78,6 +78,7 @@ struct HubView: View {
                 CreateJournalSheet(onCreate: { journal in
                     pendingJournalId = journal.id
                 })
+                .environmentObject(appState)
             }
             .navigationDestination(item: $navigateToJournalId) { journalId in
                 JournalDetailView(journalId: journalId)
@@ -87,6 +88,7 @@ struct HubView: View {
             }
             .fullScreenCover(isPresented: $showingPeople) {
                 PeopleListView()
+                    .environmentObject(appState)
             }
             .fullScreenCover(isPresented: $showingRecordings) {
                 RecordingsListView()
@@ -227,84 +229,70 @@ struct HubView: View {
                 .foregroundColor(colors.textPrimary.opacity(0.6))
                 .shadow(color: shadowColor, radius: 2, x: 0, y: 1)
 
-            // Activity card - soft, non-interruptive
-            VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                // Waiting on - tappable to go to journal
-                if let waitingOn = activityViewModel.waitingOnName,
-                   let journalId = activityViewModel.waitingOnJournalId {
-                    Button(action: {
-                        activityJournalId = journalId
-                    }) {
-                        HStack(spacing: Theme.Spacing.sm) {
-                            Image(systemName: "clock")
-                                .font(.system(size: 14))
-                                .foregroundColor(colors.accentSecondary)
-
-                            Text("Waiting on \(waitingOn)")
-                                .font(AppTypography.bodyMedium)
-                                .foregroundColor(colors.textPrimary)
-
-                            Spacer()
-
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(colors.textSecondary.opacity(0.5))
-                        }
-                    }
-                    .buttonStyle(PlainButtonStyle())
+            // Activity card - entire card is tappable
+            if let journalId = activityViewModel.waitingOnJournalId {
+                Button(action: {
+                    activityJournalId = journalId
+                }) {
+                    activityCardContent(colors: colors)
                 }
+                .buttonStyle(PlainButtonStyle())
+            } else {
+                activityCardContent(colors: colors)
+            }
+        }
+    }
 
-                if activityViewModel.awaitingCount > 0 {
-                    Text("\(activityViewModel.awaitingCount) question\(activityViewModel.awaitingCount == 1 ? "" : "s") awaiting responses")
+    // MARK: - Activity Card Content
+    @ViewBuilder
+    private func activityCardContent(colors: AppColors) -> some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+            // Waiting on row
+            if let waitingOn = activityViewModel.waitingOnName {
+                HStack(spacing: Theme.Spacing.sm) {
+                    Image(systemName: "clock")
+                        .font(.system(size: 14))
+                        .foregroundColor(colors.accentSecondary)
+
+                    Text("Waiting on \(waitingOn)")
+                        .font(AppTypography.bodyMedium)
+                        .foregroundColor(colors.textPrimary)
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(colors.textSecondary.opacity(0.5))
+                }
+            }
+
+            if activityViewModel.awaitingCount > 0 {
+                Text("\(activityViewModel.awaitingCount) question\(activityViewModel.awaitingCount == 1 ? "" : "s") awaiting responses")
+                    .font(AppTypography.caption)
+                    .foregroundColor(colors.textSecondary)
+            }
+
+            // Last reply info
+            if let lastReply = activityViewModel.lastReplyInfo {
+                HStack(spacing: Theme.Spacing.xs) {
+                    Image(systemName: "waveform")
+                        .font(.system(size: 12))
+                        .foregroundColor(colors.accentPrimary.opacity(0.7))
+
+                    Text(lastReply)
                         .font(AppTypography.caption)
                         .foregroundColor(colors.textSecondary)
                 }
-
-                // Last reply - tappable to go to that journal
-                if let lastReply = activityViewModel.lastReplyInfo {
-                    if let journalId = activityViewModel.lastReplyJournalId {
-                        Button(action: {
-                            activityJournalId = journalId
-                        }) {
-                            HStack(spacing: Theme.Spacing.xs) {
-                                Image(systemName: "waveform")
-                                    .font(.system(size: 12))
-                                    .foregroundColor(colors.accentPrimary.opacity(0.7))
-
-                                Text(lastReply)
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(colors.textSecondary)
-
-                                Spacer()
-
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 10, weight: .semibold))
-                                    .foregroundColor(colors.textSecondary.opacity(0.4))
-                            }
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        .padding(.top, Theme.Spacing.xxs)
-                    } else {
-                        HStack(spacing: Theme.Spacing.xs) {
-                            Image(systemName: "waveform")
-                                .font(.system(size: 12))
-                                .foregroundColor(colors.accentPrimary.opacity(0.7))
-
-                            Text(lastReply)
-                                .font(AppTypography.caption)
-                                .foregroundColor(colors.textSecondary)
-                        }
-                        .padding(.top, Theme.Spacing.xxs)
-                    }
-                }
+                .padding(.top, Theme.Spacing.xxs)
             }
-            .padding(Theme.Spacing.md)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: Theme.Radius.md)
-                    .fill(colors.surface.opacity(colorScheme == .dark ? 0.6 : 0.8))
-            )
         }
+        .padding(Theme.Spacing.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: Theme.Radius.md)
+                .fill(colors.surface.opacity(colorScheme == .dark ? 0.45 : 0.65))
+        )
+        .contentShape(Rectangle())
     }
 }
 

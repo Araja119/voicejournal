@@ -3,6 +3,7 @@ import SwiftUI
 struct PeopleListView: View {
     @Environment(\.colorScheme) var colorScheme
     @Environment(\.dismiss) var dismiss
+    @EnvironmentObject var appState: AppState
     @StateObject private var viewModel = PeopleViewModel()
     @State private var showingAddPerson = false
     @State private var selectedPerson: Person?
@@ -16,23 +17,48 @@ struct PeopleListView: View {
 
                 if viewModel.isLoading {
                     LoadingView()
-                } else if viewModel.people.isEmpty {
-                    EmptyStateView(
-                        icon: "person.2",
-                        title: "No People Yet",
-                        message: "Add your first person to start sending them questions",
-                        actionTitle: "Add Person",
-                        action: { showingAddPerson = true },
-                        colors: colors
-                    )
                 } else {
                     ScrollView {
                         LazyVStack(spacing: Theme.Spacing.md) {
+                            // Myself card (always at top)
+                            if let myself = viewModel.myselfPerson {
+                                MyselfCard(person: myself, colors: colors)
+                            }
+
+                            // Section header for family & friends
+                            if !viewModel.people.isEmpty {
+                                Text("Family & Friends")
+                                    .font(AppTypography.labelMedium)
+                                    .foregroundColor(colors.textSecondary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.top, Theme.Spacing.sm)
+                            }
+
+                            // Other people
                             ForEach(viewModel.people) { person in
                                 PersonCard(person: person, colors: colors)
                                     .onTapGesture {
                                         selectedPerson = person
                                     }
+                            }
+
+                            // Empty state for no other people
+                            if viewModel.people.isEmpty {
+                                VStack(spacing: Theme.Spacing.md) {
+                                    Text("No family or friends added yet")
+                                        .font(AppTypography.bodyMedium)
+                                        .foregroundColor(colors.textSecondary)
+
+                                    Button(action: { showingAddPerson = true }) {
+                                        HStack {
+                                            Image(systemName: "plus")
+                                            Text("Add Person")
+                                        }
+                                        .font(AppTypography.labelMedium)
+                                        .foregroundColor(colors.accentPrimary)
+                                    }
+                                }
+                                .padding(.top, Theme.Spacing.xl)
                             }
                         }
                         .padding(.horizontal, Theme.Spacing.lg)
@@ -73,8 +99,50 @@ struct PeopleListView: View {
             }
         }
         .task {
+            // Load people first
             await viewModel.loadPeople()
+
+            // If no "myself" person from database, create synthetic one from current user
+            if viewModel.myselfPerson == nil, let user = appState.currentUser {
+                viewModel.createSyntheticMyself(from: user)
+            }
         }
+    }
+}
+
+// MARK: - Myself Card
+struct MyselfCard: View {
+    let person: Person
+    let colors: AppColors
+
+    var body: some View {
+        HStack(spacing: Theme.Spacing.md) {
+            AvatarView(
+                name: person.name,
+                imageURL: person.profilePhotoUrl,
+                size: 56,
+                colors: colors
+            )
+
+            VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
+                Text("Myself")
+                    .font(AppTypography.headlineSmall)
+                    .foregroundColor(colors.textPrimary)
+
+                Text("Record your own stories")
+                    .font(AppTypography.bodySmall)
+                    .foregroundColor(colors.textSecondary)
+            }
+
+            Spacer()
+
+            Image(systemName: "star.fill")
+                .font(.system(size: 14))
+                .foregroundColor(colors.accentPrimary)
+        }
+        .padding(Theme.Spacing.md)
+        .background(colors.surface)
+        .cornerRadius(Theme.Radius.md)
     }
 }
 

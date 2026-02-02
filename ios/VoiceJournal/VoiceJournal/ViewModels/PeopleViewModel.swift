@@ -5,6 +5,7 @@ import Combine
 @MainActor
 class PeopleViewModel: ObservableObject {
     @Published var people: [Person] = []
+    @Published var myselfPerson: Person?
     @Published var isLoading = false
     @Published var error: String?
 
@@ -15,12 +16,46 @@ class PeopleViewModel: ObservableObject {
         error = nil
 
         do {
-            people = try await peopleService.listPeople()
+            let allPeople = try await peopleService.listPeople()
+            // Separate "myself" from other people
+            myselfPerson = allPeople.first(where: { $0.isSelf })
+            people = allPeople.filter { !$0.isSelf }
         } catch {
             self.error = "Failed to load people"
         }
 
         isLoading = false
+    }
+
+    /// Creates a synthetic "Myself" person from the current user for display purposes
+    func createSyntheticMyself(from user: User) {
+        // If we already have a real "myself" person from the database, don't override
+        if myselfPerson != nil { return }
+
+        // Create a synthetic person for display
+        myselfPerson = Person(
+            id: "myself-\(user.id)",
+            name: user.displayName,
+            relationship: "self",
+            email: user.email,
+            phoneNumber: user.phoneNumber,
+            profilePhotoUrl: user.profilePhotoUrl,
+            totalRecordings: nil,
+            pendingQuestions: nil,
+            createdAt: user.createdAt
+        )
+    }
+
+    /// Ensures a real "Myself" person record exists in the database
+    func ensureRealMyselfExists(user: User) async -> Person? {
+        do {
+            let myself = try await peopleService.ensureMyselfExists(user: user)
+            myselfPerson = myself
+            return myself
+        } catch {
+            print("Failed to create myself person in database: \(error)")
+            return nil
+        }
     }
 
     func deletePerson(id: String) async -> Bool {

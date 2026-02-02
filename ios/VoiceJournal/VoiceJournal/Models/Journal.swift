@@ -51,9 +51,20 @@ struct JournalPerson: Codable, Identifiable, Equatable {
     let name: String
     let relationship: String
     let profilePhotoUrl: String?
+    let linkedUserId: String?
 
     static func == (lhs: JournalPerson, rhs: JournalPerson) -> Bool {
         lhs.id == rhs.id
+    }
+
+    /// Returns true if this person has explicit "self" relationship
+    var isSelf: Bool {
+        relationship.lowercased() == "self"
+    }
+
+    /// Returns true if this person is linked to the given user ID
+    func isLinkedTo(userId: String) -> Bool {
+        linkedUserId == userId
     }
 }
 

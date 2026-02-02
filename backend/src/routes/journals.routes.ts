@@ -14,11 +14,14 @@ import {
 } from '../validators/journals.validators.js';
 import * as journalsService from '../services/journals.service.js';
 import * as aiService from '../services/ai.service.js';
+import * as recordingsService from '../services/recordings.service.js';
 import { success, created, noContent } from '../utils/responses.js';
 import { ValidationError } from '../utils/errors.js';
 
 const router = Router();
-const upload = multer({
+
+// Multer config for image uploads
+const imageUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
   fileFilter: (_req, file, cb) => {
@@ -29,6 +32,22 @@ const upload = multer({
     }
   },
 });
+
+// Multer config for audio uploads
+const audioUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith('audio/')) {
+      cb(null, true);
+    } else {
+      cb(new ValidationError('Only audio files are allowed'));
+    }
+  },
+});
+
+// Legacy alias
+const upload = imageUpload;
 
 // GET /journals/shared/:share_code - Can be accessed without auth for public journals
 router.get(
@@ -226,6 +245,42 @@ router.delete(
         req.params.collaborator_id as string
       );
       noContent(res);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// POST /journals/:journal_id/questions/:question_id/recordings
+// Authenticated recording upload for self-recording flow
+router.post(
+  '/:journal_id/questions/:question_id/recordings',
+  uploadLimiter,
+  audioUpload.single('audio'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.file) {
+        throw new ValidationError('No audio file uploaded');
+      }
+
+      const { journal_id, question_id } = req.params;
+      const userId = req.user!.userId;
+      const idempotencyKey = req.headers['idempotency-key'] as string | undefined;
+      const durationSeconds = req.body.duration_seconds
+        ? parseInt(req.body.duration_seconds, 10)
+        : undefined;
+
+      const recording = await recordingsService.createAuthenticatedRecording(
+        userId,
+        journal_id as string,
+        question_id as string,
+        req.file.buffer,
+        req.file.mimetype,
+        durationSeconds,
+        idempotencyKey
+      );
+
+      created(res, recording);
     } catch (err) {
       next(err);
     }
