@@ -329,49 +329,127 @@ struct InProgressCardStyled: View {
     let colors: AppColors
     let onTap: () -> Void
 
+    private var buttonText: String {
+        switch cardType {
+        case .waiting:
+            return "\(item.unansweredCount) unanswered"
+        case .continue:
+            return "Continue"
+        }
+    }
+
     var body: some View {
         Button(action: onTap) {
-            HStack(spacing: Theme.Spacing.md) {
+            HStack(spacing: Theme.Spacing.sm) {
                 // Avatar with profile photo
                 AvatarView(
                     name: item.personName,
                     imageURL: item.personPhotoUrl,
-                    size: 44,
+                    size: 40,
                     colors: colors
                 )
 
-                // Content
-                VStack(alignment: .leading, spacing: 3) {
-                    // Primary line
+                // Content - give it priority to expand
+                VStack(alignment: .leading, spacing: 2) {
+                    // Primary line - allow 2 lines for longer titles
                     Text(item.primaryText)
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(.white)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.9)
 
                     // Secondary line
                     Text(item.secondaryText)
-                        .font(.system(size: 13))
+                        .font(.system(size: 12))
                         .foregroundColor(.white.opacity(0.6))
-
-                    // Tertiary line (if available)
-                    if let tertiaryText = item.tertiaryText {
-                        Text(tertiaryText)
-                            .font(.system(size: 12))
-                            .foregroundColor(.white.opacity(0.5))
-                    }
+                        .lineLimit(1)
                 }
+                .layoutPriority(1)
 
-                Spacer()
+                Spacer(minLength: 8)
 
-                // Chevron
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.3))
+                // Golden status pill
+                StatusPill(label: buttonText)
             }
-            .padding(Theme.Spacing.md)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
             .background(colors.surface.opacity(0.4))
             .cornerRadius(Theme.Radius.md)
         }
         .buttonStyle(PlainButtonStyle())
+    }
+}
+
+// MARK: - Status Pill (Golden Gradient - Premium Style)
+struct StatusPill: View {
+    let label: String
+
+    // 3-stop golden gradient (exact spec)
+    private let gradientStart = Color(red: 0.969, green: 0.843, blue: 0.541)  // #F7D78A
+    private let gradientMid = Color(red: 0.949, green: 0.706, blue: 0.380)    // #F2B461
+    private let gradientEnd = Color(red: 0.910, green: 0.604, blue: 0.286)    // #E89A49
+
+    // Text color: rgba(55, 33, 10, 0.92) - warm dark brown, NOT black
+    private let textColor = Color(red: 0.216, green: 0.129, blue: 0.039).opacity(0.92)
+
+    var body: some View {
+        Text(label)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundColor(textColor)
+            .fixedSize(horizontal: true, vertical: false)
+            .padding(.horizontal, 10)
+            .frame(height: 26)
+            .background(
+                Capsule()
+                    .fill(
+                        LinearGradient(
+                            stops: [
+                                .init(color: gradientStart, location: 0),
+                                .init(color: gradientMid, location: 0.55),
+                                .init(color: gradientEnd, location: 1.0)
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+            )
+            // Top sheen highlight (glassy effect)
+            .overlay(
+                Capsule()
+                    .fill(
+                        LinearGradient(
+                            stops: [
+                                .init(color: Color.white.opacity(0.35), location: 0),
+                                .init(color: Color.white.opacity(0), location: 0.6)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+            )
+            // Inner top highlight (inset 0 1px 0)
+            .overlay(
+                Capsule()
+                    .inset(by: 1)
+                    .stroke(
+                        LinearGradient(
+                            stops: [
+                                .init(color: Color.white.opacity(0.18), location: 0),
+                                .init(color: Color.white.opacity(0), location: 0.3)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        ),
+                        lineWidth: 1
+                    )
+            )
+            // Outer border
+            .overlay(
+                Capsule()
+                    .stroke(Color.white.opacity(0.18), lineWidth: 1)
+            )
+            // Shadow (less blur, more lift)
+            .shadow(color: Color.black.opacity(0.28), radius: 5, x: 0, y: 4)
     }
 }
 
@@ -545,8 +623,8 @@ class ActivityViewModel: ObservableObject {
                     journalId: oldestJournal.journalId,
                     journalTitle: oldestJournal.journalTitle,
                     primaryText: "Waiting on \(personData.personName)",
-                    secondaryText: "\(personData.totalUnanswered) \(personData.totalUnanswered == 1 ? "question" : "questions") awaiting responses",
-                    tertiaryText: formatLastReply(recordingData?.recent, personName: personData.personName),
+                    secondaryText: formatLastReplyShort(recordingData?.recent),
+                    tertiaryText: nil,
                     unansweredCount: personData.totalUnanswered,
                     oldestUnansweredDate: oldestJournal.createdAt,
                     lastActivityDate: recordingData?.recent,
@@ -615,11 +693,6 @@ class ActivityViewModel: ObservableObject {
     }
 
     private func formatContinueSubtitle(_ item: InProgressItem) -> String {
-        if let lastActivity = item.lastActivityDate {
-            let formatter = RelativeDateTimeFormatter()
-            formatter.unitsStyle = .short
-            return "Answered \(formatter.localizedString(for: lastActivity, relativeTo: Date()))"
-        }
         return "\(item.unansweredCount) awaiting"
     }
 
@@ -628,6 +701,13 @@ class ActivityViewModel: ObservableObject {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .short
         return "Last reply from \(personName) — \(formatter.localizedString(for: date, relativeTo: Date()))"
+    }
+
+    private func formatLastReplyShort(_ date: Date?) -> String {
+        guard let date = date else { return "No replies yet" }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .full
+        return "Last reply \(formatter.localizedString(for: date, relativeTo: Date()))"
     }
 
     private func calculateResponseRate(totalSent: Int, totalAnswered: Int) -> Double {
