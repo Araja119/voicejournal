@@ -199,7 +199,7 @@ struct HubView: View {
             .padding(.horizontal, Theme.Spacing.sm)
             .padding(.bottom, Theme.Spacing.md)
         }
-        .background(colors.surface.opacity(0.5))
+        .background(Color(red: 0.094, green: 0.102, blue: 0.125).opacity(0.80))
         .cornerRadius(Theme.Radius.lg)
     }
 
@@ -384,13 +384,13 @@ struct InProgressCardStyled: View {
 struct StatusPill: View {
     let label: String
 
-    // 3-stop golden gradient (exact spec)
-    private let gradientStart = Color(red: 0.969, green: 0.843, blue: 0.541)  // #F7D78A
+    // 3-stop golden gradient (brighter start)
+    private let gradientStart = Color(red: 0.973, green: 0.855, blue: 0.561)  // #F8DA8F
     private let gradientMid = Color(red: 0.949, green: 0.706, blue: 0.380)    // #F2B461
     private let gradientEnd = Color(red: 0.910, green: 0.604, blue: 0.286)    // #E89A49
 
-    // Text color: rgba(55, 33, 10, 0.92) - warm dark brown, NOT black
-    private let textColor = Color(red: 0.216, green: 0.129, blue: 0.039).opacity(0.92)
+    // Text color: rgba(60, 36, 12, 0.92) - warm brown, NOT black
+    private let textColor = Color(red: 0.235, green: 0.141, blue: 0.047).opacity(0.92)
 
     var body: some View {
         Text(label)
@@ -413,14 +413,14 @@ struct StatusPill: View {
                         )
                     )
             )
-            // Top sheen highlight (glassy effect)
+            // Top sheen highlight (stronger glassy effect)
             .overlay(
                 Capsule()
                     .fill(
                         LinearGradient(
                             stops: [
-                                .init(color: Color.white.opacity(0.35), location: 0),
-                                .init(color: Color.white.opacity(0), location: 0.6)
+                                .init(color: Color.white.opacity(0.45), location: 0),
+                                .init(color: Color.white.opacity(0), location: 0.55)
                             ],
                             startPoint: .top,
                             endPoint: .bottom
@@ -434,7 +434,7 @@ struct StatusPill: View {
                     .stroke(
                         LinearGradient(
                             stops: [
-                                .init(color: Color.white.opacity(0.18), location: 0),
+                                .init(color: Color.white.opacity(0.22), location: 0),
                                 .init(color: Color.white.opacity(0), location: 0.3)
                             ],
                             startPoint: .top,
@@ -448,8 +448,10 @@ struct StatusPill: View {
                 Capsule()
                     .stroke(Color.white.opacity(0.18), lineWidth: 1)
             )
-            // Shadow (less blur, more lift)
-            .shadow(color: Color.black.opacity(0.28), radius: 5, x: 0, y: 4)
+            // Shadow (more lift)
+            .shadow(color: Color.black.opacity(0.32), radius: 7, x: 0, y: 6)
+            // Vertical nudge down 2px
+            .offset(y: 2)
     }
 }
 
