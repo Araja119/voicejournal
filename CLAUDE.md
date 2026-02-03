@@ -71,6 +71,7 @@ voicejournal/
 │       │   ├── AppBackground.swift    # Gradient vignette over image
 │       │   ├── AvatarView.swift
 │       │   ├── EmptyStateView.swift
+│       │   ├── GlassView.swift        # Frosted glass card modifiers
 │       │   └── LoadingView.swift
 │       └── Auth/
 │           ├── LoginView.swift
@@ -260,6 +261,44 @@ private var loadedCardTwo: InProgressItem?
   - Bottom: 5-10% opacity, gradual fade
 - Supports light/dark mode image variants
 
+### Frosted Glass System (GlassView.swift)
+The app uses a custom frosted glass system that provides true translucency with visible background bleed-through in both light and dark modes.
+
+**Components:**
+- `GlassCardModifier` - Primary cards with `.glassCard()` extension
+- `GlassCardSecondaryModifier` - Nested/inner cards with `.glassCardSecondary()` extension
+- `GlassIconCircle` - Frosted glass icon circles (48pt default)
+- `GlassTextColors` - Consistent text colors for glass surfaces
+- `GlassIconColors` - Predefined icon colors (sendQuestion orange, slate for others)
+- `TranslucentBlurView` - UIKit wrapper for precise blur control
+
+**Light Mode Implementation:**
+The key insight is that SwiftUI's built-in materials (`.ultraThinMaterial`, etc.) render as opaque white in light mode. The solution uses UIKit's `UIVisualEffectView`:
+```swift
+// Light mode: UIKit blur + subtle white overlay
+ZStack {
+    TranslucentBlurView(style: .light, intensity: 0.38)
+    RoundedRectangle(...).fill(Color.white.opacity(0.22))
+}
+```
+
+**Text Colors (GlassTextColors):**
+- Light mode: primary (black 0.82), secondary (0.55), tertiary (0.35), sectionLabel (0.65)
+- Dark mode: primary (white), secondary (0.6), tertiary (0.4), sectionLabel (0.9)
+
+**Icon Colors (GlassIconColors):**
+- `sendQuestion`: #FF7A2F (orange)
+- `slate`: #5B6B9A (muted indigo for People, Recordings icons)
+
+**Usage:**
+```swift
+VStack { ... }
+    .padding(Theme.Spacing.md)
+    .glassCard(cornerRadius: 22)
+
+GlassIconCircle(icon: "paperplane.fill", iconColor: GlassIconColors.sendQuestion)
+```
+
 ## API Endpoints
 
 Base URL: `http://localhost:3000/v1`
@@ -368,6 +407,10 @@ For child views with action menus (like QuestionTimelineCard):
 - [x] Hybrid In Progress panel (emotional anchor + momentum win cards)
 - [x] Stable card caching to prevent UI glitches during navigation
 - [x] "New Journal" moved from home screen to Journals list
+- [x] Light mode frosted glass system (GlassView.swift)
+- [x] True translucent cards with background bleed-through
+- [x] GlassTextColors and GlassIconColors for consistent styling
+- [x] UIKit TranslucentBlurView for precise blur control
 
 ### TODO
 - [ ] "Send to [Name]" button flow - send questions to recipients
@@ -504,4 +547,4 @@ model QuestionAssignment {
 - Backend: `/Users/ARaja/voicejournal/backend/`
 
 ---
-*Last updated: February 2026 - Home screen redesign with carousel text and hybrid In Progress panel, profile photo sync, collapsible recordings list with quick-play, edit journal feature*
+*Last updated: February 2026 - Light mode frosted glass system with true translucency and background bleed-through using UIKit blur*

@@ -199,6 +199,8 @@ struct JournalSection {
 
 // MARK: - Person Journal Section
 struct PersonJournalSection: View {
+    @Environment(\.colorScheme) var colorScheme
+
     let section: JournalSection
     let isStarred: Bool
     let canStar: Bool
@@ -208,10 +210,6 @@ struct PersonJournalSection: View {
     let onToggleCollapse: () -> Void
     let onDelete: () -> Void
     let colors: AppColors
-
-    // Surface colors for two-tier system
-    private let personRowSurface = Color(red: 0.094, green: 0.102, blue: 0.125).opacity(0.48)
-    private let journalCardSurface = Color(red: 0.094, green: 0.102, blue: 0.125).opacity(0.72)
 
     // Activity summary text - neutral colors, no gold
     private var activitySummary: String {
@@ -225,10 +223,13 @@ struct PersonJournalSection: View {
         return journalText
     }
 
-    // Container surface that wraps person + journals (matches home page)
-    private let containerSurface = Color(red: 0.094, green: 0.102, blue: 0.125).opacity(0.68)
+    private var dividerColor: Color {
+        colorScheme == .dark ? Color.white.opacity(0.06) : Color.black.opacity(0.06)
+    }
 
     var body: some View {
+        let textColors = GlassTextColors(colorScheme: colorScheme)
+
         // Single glass container for person + all their journals
         VStack(spacing: 0) {
             // Person header row
@@ -246,11 +247,11 @@ struct PersonJournalSection: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(section.person.name)
                             .font(.system(size: 17, weight: .semibold))
-                            .foregroundColor(.white)
+                            .foregroundColor(textColors.primary)
 
                         Text(activitySummary)
                             .font(.system(size: 13))
-                            .foregroundColor(.white.opacity(0.6))
+                            .foregroundColor(textColors.secondary)
                     }
 
                     Spacer()
@@ -258,7 +259,7 @@ struct PersonJournalSection: View {
                     // Chevron
                     Image(systemName: "chevron.down")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.5))
+                        .foregroundColor(textColors.tertiary)
                         .rotationEffect(.degrees(isCollapsed ? -90 : 0))
                         .animation(.easeInOut(duration: 0.2), value: isCollapsed)
                 }
@@ -271,7 +272,7 @@ struct PersonJournalSection: View {
             if !isCollapsed {
                 // Divider between header and journals
                 Rectangle()
-                    .fill(Color.white.opacity(0.06))
+                    .fill(dividerColor)
                     .frame(height: 1)
                     .padding(.horizontal, 16)
                     .padding(.top, 4)
@@ -288,7 +289,7 @@ struct PersonJournalSection: View {
                         // Subtle separator between journals (not after last)
                         if index < section.journals.count - 1 {
                             Rectangle()
-                                .fill(Color.white.opacity(0.04))
+                                .fill(colorScheme == .dark ? Color.white.opacity(0.04) : Color.black.opacity(0.04))
                                 .frame(height: 1)
                                 .padding(.leading, 60)
                         }
@@ -300,15 +301,7 @@ struct PersonJournalSection: View {
             }
         }
         .padding(.bottom, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(containerSurface)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(Color.white.opacity(0.06), lineWidth: 1)
-        )
-        .shadow(color: Color.black.opacity(0.30), radius: 12, x: 0, y: 6)
+        .glassCard(cornerRadius: 20)
         .padding(.horizontal, Theme.Spacing.lg)
         .padding(.top, isFirst ? 0 : 24)
     }
@@ -316,15 +309,14 @@ struct PersonJournalSection: View {
 
 // MARK: - General Journal Section
 struct GeneralJournalSection: View {
+    @Environment(\.colorScheme) var colorScheme
+
     let journals: [Journal]
     let isCollapsed: Bool
     let isFirst: Bool
     let onToggleCollapse: () -> Void
     let onDelete: () -> Void
     let colors: AppColors
-
-    // Surface colors for two-tier system
-    private let personRowSurface = Color(red: 0.094, green: 0.102, blue: 0.125).opacity(0.48)
 
     // Activity stats
     private var totalQuestions: Int {
@@ -347,39 +339,34 @@ struct GeneralJournalSection: View {
         return journalText
     }
 
-    // Container surface (matches home page)
-    private let containerSurface = Color(red: 0.094, green: 0.102, blue: 0.125).opacity(0.68)
+    private var dividerColor: Color {
+        colorScheme == .dark ? Color.white.opacity(0.06) : Color.black.opacity(0.06)
+    }
 
     var body: some View {
+        let textColors = GlassTextColors(colorScheme: colorScheme)
+
         VStack(spacing: 0) {
             // Header row
             Button(action: onToggleCollapse) {
                 HStack(spacing: Theme.Spacing.md) {
-                    ZStack {
-                        Circle()
-                            .fill(Color.white.opacity(0.1))
-                            .frame(width: 44, height: 44)
-
-                        Image(systemName: "book.closed.fill")
-                            .font(.system(size: 18))
-                            .foregroundColor(.white.opacity(0.6))
-                    }
+                    GlassIconCircle(icon: "book.closed.fill", iconColor: GlassIconColors.slate, size: 44)
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text("General")
                             .font(.system(size: 17, weight: .semibold))
-                            .foregroundColor(.white)
+                            .foregroundColor(textColors.primary)
 
                         Text(activitySummary)
                             .font(.system(size: 13))
-                            .foregroundColor(.white.opacity(0.6))
+                            .foregroundColor(textColors.secondary)
                     }
 
                     Spacer()
 
                     Image(systemName: "chevron.down")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.5))
+                        .foregroundColor(textColors.tertiary)
                         .rotationEffect(.degrees(isCollapsed ? -90 : 0))
                         .animation(.easeInOut(duration: 0.2), value: isCollapsed)
                 }
@@ -391,7 +378,7 @@ struct GeneralJournalSection: View {
             // Journals inside container
             if !isCollapsed {
                 Rectangle()
-                    .fill(Color.white.opacity(0.06))
+                    .fill(dividerColor)
                     .frame(height: 1)
                     .padding(.horizontal, 16)
                     .padding(.top, 4)
@@ -407,7 +394,7 @@ struct GeneralJournalSection: View {
 
                         if index < journals.count - 1 {
                             Rectangle()
-                                .fill(Color.white.opacity(0.04))
+                                .fill(colorScheme == .dark ? Color.white.opacity(0.04) : Color.black.opacity(0.04))
                                 .frame(height: 1)
                                 .padding(.leading, 60)
                         }
@@ -419,15 +406,7 @@ struct GeneralJournalSection: View {
             }
         }
         .padding(.bottom, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(containerSurface)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(Color.white.opacity(0.06), lineWidth: 1)
-        )
-        .shadow(color: Color.black.opacity(0.30), radius: 12, x: 0, y: 6)
+        .glassCard(cornerRadius: 20)
         .padding(.horizontal, Theme.Spacing.lg)
         .padding(.top, isFirst ? 0 : 24)
     }
@@ -435,6 +414,8 @@ struct GeneralJournalSection: View {
 
 // MARK: - Compact Journal Row (simple row inside container, no decoration)
 struct CompactJournalCard: View {
+    @Environment(\.colorScheme) var colorScheme
+
     let journal: Journal
     let colors: AppColors
 
@@ -461,6 +442,8 @@ struct CompactJournalCard: View {
     }
 
     var body: some View {
+        let textColors = GlassTextColors(colorScheme: colorScheme)
+
         HStack(spacing: 12) {
             // Cover placeholder
             Group {
@@ -486,13 +469,13 @@ struct CompactJournalCard: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(journal.title)
                     .font(.system(size: 15, weight: .medium))
-                    .foregroundColor(.white)
+                    .foregroundColor(textColors.primary)
                     .lineLimit(1)
 
                 if let status = statusText {
                     Text(status)
                         .font(.system(size: 12))
-                        .foregroundColor(.white.opacity(0.5))
+                        .foregroundColor(textColors.secondary)
                         .lineLimit(1)
                 }
             }
@@ -501,7 +484,7 @@ struct CompactJournalCard: View {
 
             Image(systemName: "chevron.right")
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(.white.opacity(0.3))
+                .foregroundColor(textColors.tertiary)
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 4)
@@ -510,11 +493,11 @@ struct CompactJournalCard: View {
 
     private var coverPlaceholder: some View {
         Rectangle()
-            .fill(Color.white.opacity(0.08))
+            .fill(colorScheme == .dark ? Color.white.opacity(0.08) : Color.black.opacity(0.06))
             .overlay(
                 Image(systemName: "book.fill")
                     .font(.system(size: 14))
-                    .foregroundColor(.white.opacity(0.2))
+                    .foregroundColor(colorScheme == .dark ? .white.opacity(0.2) : .black.opacity(0.15))
             )
     }
 }

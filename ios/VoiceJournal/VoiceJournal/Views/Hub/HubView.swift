@@ -104,11 +104,13 @@ struct HubView: View {
     // MARK: - Top Bar
     @ViewBuilder
     private func topBar(colors: AppColors) -> some View {
+        let textColors = GlassTextColors(colorScheme: colorScheme)
+
         HStack {
             Button(action: { showingJournals = true }) {
                 Image(systemName: "line.3.horizontal")
                     .font(.system(size: 20, weight: .medium))
-                    .foregroundColor(.white.opacity(0.8))
+                    .foregroundColor(textColors.secondary)
                     .frame(width: 44, height: 44)
             }
 
@@ -117,7 +119,7 @@ struct HubView: View {
             Button(action: { showingSettings = true }) {
                 Image(systemName: "gearshape")
                     .font(.system(size: 20, weight: .medium))
-                    .foregroundColor(.white.opacity(0.8))
+                    .foregroundColor(textColors.secondary)
                     .frame(width: 44, height: 44)
             }
         }
@@ -127,20 +129,22 @@ struct HubView: View {
     // MARK: - Welcome Header with Carousel
     @ViewBuilder
     private func welcomeHeader(colors: AppColors) -> some View {
+        let textColors = GlassTextColors(colorScheme: colorScheme)
+
         VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
             Text("Welcome back,")
                 .font(.system(size: 20, weight: .regular))
-                .foregroundColor(.white.opacity(0.85))
+                .foregroundColor(textColors.secondary)
 
             Text(appState.currentUser?.displayName ?? "Friend")
                 .font(.system(size: 34, weight: .bold))
-                .foregroundColor(.white)
+                .foregroundColor(textColors.primary)
 
             // Carousel text - observant, not instructive
             // Soft, gradual fade between sentences
             Text(activityViewModel.carouselText(at: currentCarouselIndex))
                 .font(.system(size: 16, weight: .medium))
-                .foregroundColor(.white.opacity(0.7))
+                .foregroundColor(textColors.secondary)
                 .padding(.top, Theme.Spacing.xxs)
                 .id(currentCarouselIndex)
                 .transition(.opacity.animation(.easeInOut(duration: 1.8)))
@@ -154,6 +158,8 @@ struct HubView: View {
     // MARK: - In Progress Panel
     @ViewBuilder
     private func inProgressPanel(colors: AppColors) -> some View {
+        let textColors = GlassTextColors(colorScheme: colorScheme)
+
         VStack(alignment: .leading, spacing: Theme.Spacing.md) {
             // Section header
             HStack(spacing: Theme.Spacing.sm) {
@@ -163,7 +169,7 @@ struct HubView: View {
 
                 Text("In Progress")
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.9))
+                    .foregroundColor(textColors.sectionLabel)
 
                 Spacer()
             }
@@ -199,57 +205,37 @@ struct HubView: View {
             .padding(.horizontal, Theme.Spacing.sm)
             .padding(.bottom, Theme.Spacing.md)
         }
-        .background(
-            RoundedRectangle(cornerRadius: Theme.Radius.lg)
-                .fill(Color(red: 0.094, green: 0.102, blue: 0.125).opacity(0.78))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.Radius.lg)
-                .stroke(Color.white.opacity(0.05), lineWidth: 1)
-        )
-        .shadow(color: Color.black.opacity(0.35), radius: 12, x: 0, y: 8)
+        .glassCard(cornerRadius: Theme.Radius.lg)
     }
 
     // MARK: - Send Question Card
     @ViewBuilder
     private func sendQuestionCard(colors: AppColors) -> some View {
+        let textColors = GlassTextColors(colorScheme: colorScheme)
+
         Button(action: { showingSendQuestion = true }) {
             HStack(spacing: Theme.Spacing.md) {
-                Circle()
-                    .fill(colors.accentPrimary.opacity(0.2))
-                    .frame(width: 48, height: 48)
-                    .overlay(
-                        Image(systemName: "paperplane.fill")
-                            .font(.system(size: 20, weight: .semibold))
-                            .foregroundColor(colors.accentPrimary)
-                    )
+                // Glass icon circle with orange accent
+                GlassIconCircle(icon: "paperplane.fill", iconColor: GlassIconColors.sendQuestion)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Send Question")
                         .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(.white)
+                        .foregroundColor(textColors.primary)
 
                     Text("Prompt a meaningful memory")
                         .font(.system(size: 14))
-                        .foregroundColor(.white.opacity(0.6))
+                        .foregroundColor(textColors.secondary)
                 }
 
                 Spacer()
 
                 Image(systemName: "chevron.right")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.4))
+                    .foregroundColor(textColors.tertiary)
             }
             .padding(Theme.Spacing.md)
-            .background(
-                RoundedRectangle(cornerRadius: Theme.Radius.lg)
-                    .fill(Color(red: 0.094, green: 0.102, blue: 0.125).opacity(0.64))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: Theme.Radius.lg)
-                    .stroke(Color.white.opacity(0.05), lineWidth: 1)
-            )
-            .shadow(color: Color.black.opacity(0.35), radius: 12, x: 0, y: 8)
+            .glassCard(cornerRadius: Theme.Radius.lg)
         }
         .buttonStyle(PlainButtonStyle())
     }
@@ -257,44 +243,31 @@ struct HubView: View {
     // MARK: - My People Card
     @ViewBuilder
     private func myPeopleCard(colors: AppColors) -> some View {
+        let textColors = GlassTextColors(colorScheme: colorScheme)
+
         Button(action: { showingPeople = true }) {
             HStack(spacing: Theme.Spacing.md) {
-                ZStack {
-                    Circle()
-                        .fill(colors.textSecondary.opacity(0.15))
-                        .frame(width: 48, height: 48)
-
-                    Image(systemName: "person.2.fill")
-                        .font(.system(size: 18))
-                        .foregroundColor(.white.opacity(0.7))
-                }
+                // Glass icon circle with slate tint
+                GlassIconCircle(icon: "person.2.fill", iconColor: GlassIconColors.slate)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("My People")
                         .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(.white)
+                        .foregroundColor(textColors.primary)
 
                     Text("The voices that matter")
                         .font(.system(size: 14))
-                        .foregroundColor(.white.opacity(0.6))
+                        .foregroundColor(textColors.secondary)
                 }
 
                 Spacer()
 
                 Image(systemName: "chevron.right")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.4))
+                    .foregroundColor(textColors.tertiary)
             }
             .padding(Theme.Spacing.md)
-            .background(
-                RoundedRectangle(cornerRadius: Theme.Radius.lg)
-                    .fill(Color(red: 0.094, green: 0.102, blue: 0.125).opacity(0.64))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: Theme.Radius.lg)
-                    .stroke(Color.white.opacity(0.05), lineWidth: 1)
-            )
-            .shadow(color: Color.black.opacity(0.35), radius: 12, x: 0, y: 8)
+            .glassCard(cornerRadius: Theme.Radius.lg)
         }
         .buttonStyle(PlainButtonStyle())
     }
@@ -302,44 +275,31 @@ struct HubView: View {
     // MARK: - Latest Recordings Card
     @ViewBuilder
     private func latestRecordingsCard(colors: AppColors) -> some View {
+        let textColors = GlassTextColors(colorScheme: colorScheme)
+
         Button(action: { showingRecordings = true }) {
             HStack(spacing: Theme.Spacing.md) {
-                ZStack {
-                    Circle()
-                        .fill(colors.textSecondary.opacity(0.15))
-                        .frame(width: 48, height: 48)
-
-                    Image(systemName: "waveform")
-                        .font(.system(size: 18))
-                        .foregroundColor(.white.opacity(0.7))
-                }
+                // Glass icon circle with slate tint
+                GlassIconCircle(icon: "waveform", iconColor: GlassIconColors.slate)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Latest Recordings")
                         .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(.white)
+                        .foregroundColor(textColors.primary)
 
                     Text("Listen back")
                         .font(.system(size: 14))
-                        .foregroundColor(.white.opacity(0.6))
+                        .foregroundColor(textColors.secondary)
                 }
 
                 Spacer()
 
                 Image(systemName: "chevron.right")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.4))
+                    .foregroundColor(textColors.tertiary)
             }
             .padding(Theme.Spacing.md)
-            .background(
-                RoundedRectangle(cornerRadius: Theme.Radius.lg)
-                    .fill(Color(red: 0.094, green: 0.102, blue: 0.125).opacity(0.64))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: Theme.Radius.lg)
-                    .stroke(Color.white.opacity(0.05), lineWidth: 1)
-            )
-            .shadow(color: Color.black.opacity(0.35), radius: 12, x: 0, y: 8)
+            .glassCard(cornerRadius: Theme.Radius.lg)
         }
         .buttonStyle(PlainButtonStyle())
     }
@@ -347,6 +307,8 @@ struct HubView: View {
 
 // MARK: - In Progress Card (Mockup Style with Avatar)
 struct InProgressCardStyled: View {
+    @Environment(\.colorScheme) var colorScheme
+
     enum CardType {
         case waiting
         case `continue`
@@ -367,6 +329,8 @@ struct InProgressCardStyled: View {
     }
 
     var body: some View {
+        let textColors = GlassTextColors(colorScheme: colorScheme)
+
         Button(action: onTap) {
             HStack(spacing: Theme.Spacing.sm) {
                 // Avatar with profile photo
@@ -382,14 +346,14 @@ struct InProgressCardStyled: View {
                     // Primary line - allow 2 lines for longer titles
                     Text(item.primaryText)
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.white)
+                        .foregroundColor(textColors.primary)
                         .lineLimit(2)
                         .minimumScaleFactor(0.9)
 
                     // Secondary line
                     Text(item.secondaryText)
                         .font(.system(size: 12))
-                        .foregroundColor(.white.opacity(0.6))
+                        .foregroundColor(textColors.secondary)
                         .lineLimit(1)
                 }
                 .layoutPriority(1)
@@ -401,8 +365,7 @@ struct InProgressCardStyled: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
-            .background(colors.surface.opacity(0.4))
-            .cornerRadius(Theme.Radius.md)
+            .glassCardSecondary(cornerRadius: Theme.Radius.md)
         }
         .buttonStyle(PlainButtonStyle())
     }

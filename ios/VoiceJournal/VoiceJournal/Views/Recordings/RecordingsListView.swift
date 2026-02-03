@@ -55,9 +55,9 @@ struct RecordingsListView: View {
                     Button(action: { dismiss() }) {
                         Image(systemName: "xmark")
                             .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(.white.opacity(0.8))
+                            .foregroundColor(colorScheme == .dark ? .white.opacity(0.8) : .black.opacity(0.6))
                             .padding(10)
-                            .background(Color.white.opacity(0.15))
+                            .background(colorScheme == .dark ? Color.white.opacity(0.15) : Color.black.opacity(0.08))
                             .clipShape(Circle())
                     }
                 }
@@ -65,7 +65,7 @@ struct RecordingsListView: View {
                 ToolbarItem(placement: .principal) {
                     Text("Recordings")
                         .font(AppTypography.headlineSmall)
-                        .foregroundColor(.white)
+                        .foregroundColor(colorScheme == .dark ? .white : .black.opacity(0.85))
                 }
             }
             .fullScreenCover(item: $selectedRecording) { recording in
@@ -133,6 +133,8 @@ struct RecordingSection {
 
 // MARK: - Person Recording Section
 struct PersonRecordingSection: View {
+    @Environment(\.colorScheme) var colorScheme
+
     let section: RecordingSection
     let isCollapsed: Bool
     @ObservedObject var quickPlayer: QuickPlayManager
@@ -143,6 +145,13 @@ struct PersonRecordingSection: View {
     private var recordingCountText: String {
         let count = section.recordings.count
         return "\(count) recording\(count == 1 ? "" : "s")"
+    }
+
+    // Surface color - matches HubView and JournalsListView
+    private var sectionSurface: Color {
+        colorScheme == .dark
+            ? Color(red: 0.094, green: 0.102, blue: 0.125).opacity(0.68)
+            : Color.white.opacity(0.75)
     }
 
     var body: some View {
@@ -161,19 +170,19 @@ struct PersonRecordingSection: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(section.person.name)
                             .font(AppTypography.headlineSmall)
-                            .foregroundColor(colors.textPrimary)
+                            .foregroundColor(colorScheme == .dark ? .white : .black.opacity(0.85))
 
                         HStack(spacing: Theme.Spacing.xs) {
                             Text(recordingCountText)
                                 .font(AppTypography.caption)
-                                .foregroundColor(colors.textSecondary)
+                                .foregroundColor(colorScheme == .dark ? .white.opacity(0.6) : .black.opacity(0.5))
 
                             Text("•")
-                                .foregroundColor(colors.textSecondary.opacity(0.5))
+                                .foregroundColor(colorScheme == .dark ? .white.opacity(0.3) : .black.opacity(0.25))
 
                             Text(section.formattedTotalDuration)
                                 .font(AppTypography.caption)
-                                .foregroundColor(colors.textSecondary)
+                                .foregroundColor(colorScheme == .dark ? .white.opacity(0.6) : .black.opacity(0.5))
                         }
                     }
 
@@ -182,14 +191,13 @@ struct PersonRecordingSection: View {
                     // Collapse indicator
                     Image(systemName: "chevron.right")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(colors.textSecondary)
+                        .foregroundColor(colorScheme == .dark ? .white.opacity(0.5) : .black.opacity(0.4))
                         .frame(width: 24, height: 24)
                         .rotationEffect(.degrees(isCollapsed ? 0 : 90))
                         .animation(.easeInOut(duration: 0.2), value: isCollapsed)
                 }
                 .padding(.horizontal, Theme.Spacing.lg)
                 .padding(.vertical, Theme.Spacing.md)
-                .background(colors.surface.opacity(0.5))
             }
             .buttonStyle(PlainButtonStyle())
 
@@ -205,21 +213,28 @@ struct PersonRecordingSection: View {
                         )
                     }
                 }
-                .padding(.horizontal, Theme.Spacing.lg)
+                .padding(.horizontal, Theme.Spacing.md)
                 .padding(.vertical, Theme.Spacing.sm)
             }
-
-            // Divider
-            Rectangle()
-                .fill(colors.textSecondary.opacity(0.15))
-                .frame(height: 2)
-                .padding(.top, Theme.Spacing.xs)
         }
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(sectionSurface)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(colorScheme == .dark ? Color.white.opacity(0.06) : Color.black.opacity(0.05), lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.30 : 0.12), radius: 12, x: 0, y: 6)
+        .padding(.horizontal, Theme.Spacing.lg)
+        .padding(.top, Theme.Spacing.md)
     }
 }
 
 // MARK: - Compact Recording Card
 struct CompactRecordingCard: View {
+    @Environment(\.colorScheme) var colorScheme
+
     let recording: Recording
     @ObservedObject var quickPlayer: QuickPlayManager
     let onTapCard: () -> Void
@@ -231,6 +246,13 @@ struct CompactRecordingCard: View {
 
     private var isThisRecording: Bool {
         quickPlayer.currentRecordingId == recording.id
+    }
+
+    // Inner card surface
+    private var cardSurface: Color {
+        colorScheme == .dark
+            ? Color.white.opacity(isThisRecording ? 0.08 : 0.05)
+            : Color.white.opacity(isThisRecording ? 0.9 : 0.6)
     }
 
     var body: some View {
@@ -280,7 +302,7 @@ struct CompactRecordingCard: View {
                 if let question = recording.question {
                     Text(question.questionText)
                         .font(AppTypography.labelMedium)
-                        .foregroundColor(colors.textPrimary)
+                        .foregroundColor(colorScheme == .dark ? .white : .black.opacity(0.85))
                         .lineLimit(1)
                 }
 
@@ -292,7 +314,7 @@ struct CompactRecordingCard: View {
                 } else if let recordedAt = recording.recordedAt {
                     Text(recordedAt.formatted(date: .abbreviated, time: .shortened))
                         .font(AppTypography.caption)
-                        .foregroundColor(colors.textSecondary)
+                        .foregroundColor(colorScheme == .dark ? .white.opacity(0.5) : .black.opacity(0.45))
                 }
             }
 
@@ -302,18 +324,20 @@ struct CompactRecordingCard: View {
             if !isThisRecording {
                 Text(recording.formattedDuration)
                     .font(.system(size: 13, weight: .medium, design: .monospaced))
-                    .foregroundColor(colors.textSecondary)
+                    .foregroundColor(colorScheme == .dark ? .white.opacity(0.6) : .black.opacity(0.5))
             }
 
             // Chevron
             Image(systemName: "chevron.right")
                 .font(.system(size: 10, weight: .semibold))
-                .foregroundColor(colors.textSecondary.opacity(0.5))
+                .foregroundColor(colorScheme == .dark ? .white.opacity(0.3) : .black.opacity(0.25))
         }
         .padding(.horizontal, Theme.Spacing.sm)
         .padding(.vertical, Theme.Spacing.sm)
-        .background(isThisRecording ? colors.surface : colors.surface.opacity(0.8))
-        .cornerRadius(Theme.Radius.sm)
+        .background(
+            RoundedRectangle(cornerRadius: Theme.Radius.sm)
+                .fill(cardSurface)
+        )
         .contentShape(Rectangle())
         .onTapGesture {
             onTapCard()

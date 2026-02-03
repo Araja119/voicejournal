@@ -430,24 +430,24 @@ struct JournalDetailView: View {
                     if isMyJournal {
                         Text("My Journal")
                             .font(AppTypography.labelMedium)
-                            .foregroundColor(colors.textPrimary)
+                            .foregroundColor(colorScheme == .dark ? .white : .black.opacity(0.85))
                     } else {
                         Text("For \(person.name)")
                             .font(AppTypography.labelMedium)
-                            .foregroundColor(colors.textPrimary)
+                            .foregroundColor(colorScheme == .dark ? .white : .black.opacity(0.85))
                     }
                 }
             }
 
             Text(journal.title)
                 .font(AppTypography.headlineLarge)
-                .foregroundColor(colors.textPrimary)
+                .foregroundColor(colorScheme == .dark ? .white : .black.opacity(0.85))
                 .lineLimit(2)
 
             if let description = journal.description, !description.isEmpty {
                 Text(description)
                     .font(AppTypography.bodyMedium)
-                    .foregroundColor(colors.textSecondary.opacity(0.70))
+                    .foregroundColor(colorScheme == .dark ? .white.opacity(0.6) : .black.opacity(0.5))
                     .italic()
                     .lineLimit(2)
             }
@@ -459,12 +459,12 @@ struct JournalDetailView: View {
                 RoundedRectangle(cornerRadius: Theme.Radius.lg)
                     .fill(.regularMaterial)
                 RoundedRectangle(cornerRadius: Theme.Radius.lg)
-                    .fill(Color.black.opacity(0.25))
+                    .fill(colorScheme == .dark ? Color.black.opacity(0.25) : Color.white.opacity(0.4))
             }
         )
         .overlay(
             RoundedRectangle(cornerRadius: Theme.Radius.lg)
-                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                .stroke(colorScheme == .dark ? Color.white.opacity(0.1) : Color.black.opacity(0.06), lineWidth: 1)
         )
     }
 
@@ -720,7 +720,7 @@ struct JournalDetailView: View {
         VStack(alignment: .leading, spacing: 0) {
             Text("Journal Timeline")
                 .font(AppTypography.headlineSmall)
-                .foregroundColor(colors.textPrimary)
+                .foregroundColor(colorScheme == .dark ? .white : .black.opacity(0.85))
                 .padding(.bottom, Theme.Spacing.md)
 
             ForEach(Array(questions.enumerated()), id: \.element.id) { index, question in
@@ -836,6 +836,8 @@ enum QuestionState {
 
 // MARK: - Question Timeline Card
 struct QuestionTimelineCard: View {
+    @Environment(\.colorScheme) var colorScheme
+
     let question: Question
     let recipientName: String?
     let state: QuestionState
@@ -857,7 +859,7 @@ struct QuestionTimelineCard: View {
             HStack(alignment: .top) {
                 Text(question.questionText)
                     .font(AppTypography.bodyLarge)
-                    .foregroundColor(colors.textPrimary)
+                    .foregroundColor(colorScheme == .dark ? .white : .black.opacity(0.85))
 
                 Spacer()
 
@@ -884,7 +886,7 @@ struct QuestionTimelineCard: View {
                 } label: {
                     Image(systemName: "ellipsis")
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(colors.textSecondary)
+                        .foregroundColor(colorScheme == .dark ? .white.opacity(0.6) : .black.opacity(0.5))
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
                 }
@@ -907,30 +909,48 @@ struct QuestionTimelineCard: View {
                 // Backdrop blur
                 RoundedRectangle(cornerRadius: Theme.Radius.md)
                     .fill(.ultraThinMaterial)
-                // Dark overlay
+                // Overlay
                 RoundedRectangle(cornerRadius: Theme.Radius.md)
                     .fill(cardBackground)
             }
         )
         .cornerRadius(Theme.Radius.md)
-        // Border: 1px solid rgba(255, 255, 255, 0.05)
         .overlay(
             RoundedRectangle(cornerRadius: Theme.Radius.md)
-                .stroke(state == .answered ? colors.accentPrimary.opacity(0.25) : Color.white.opacity(0.05), lineWidth: 1)
+                .stroke(borderColor, lineWidth: 1)
         )
     }
 
-    // MARK: - State-Based Background
-    // Using rgba(24, 26, 32) with varying opacity for timeline cards
+    // MARK: - State-Based Background - color scheme aware
     private var cardBackground: Color {
-        let baseColor = Color(red: 24/255, green: 26/255, blue: 32/255)
-        switch state {
-        case .draft:
-            return baseColor.opacity(0.72)
-        case .awaiting:
-            return baseColor.opacity(0.68)
-        case .answered:
-            return baseColor.opacity(0.75)
+        if colorScheme == .dark {
+            let baseColor = Color(red: 24/255, green: 26/255, blue: 32/255)
+            switch state {
+            case .draft:
+                return baseColor.opacity(0.72)
+            case .awaiting:
+                return baseColor.opacity(0.68)
+            case .answered:
+                return baseColor.opacity(0.75)
+            }
+        } else {
+            // Light mode: use white with varying opacity
+            switch state {
+            case .draft:
+                return Color.white.opacity(0.6)
+            case .awaiting:
+                return Color.white.opacity(0.55)
+            case .answered:
+                return Color.white.opacity(0.7)
+            }
+        }
+    }
+
+    private var borderColor: Color {
+        if colorScheme == .dark {
+            return state == .answered ? colors.accentPrimary.opacity(0.25) : Color.white.opacity(0.05)
+        } else {
+            return state == .answered ? colors.accentPrimary.opacity(0.3) : Color.black.opacity(0.06)
         }
     }
 
@@ -1014,7 +1034,7 @@ struct QuestionTimelineCard: View {
 
                             Text(name)
                                 .font(AppTypography.bodySmall)
-                                .foregroundColor(colors.textPrimary)
+                                .foregroundColor(colorScheme == .dark ? .white : .black.opacity(0.85))
                         }
 
                         Spacer()
@@ -1083,7 +1103,7 @@ struct QuestionTimelineCard: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(name)
                                 .font(AppTypography.bodySmall)
-                                .foregroundColor(colors.textPrimary)
+                                .foregroundColor(colorScheme == .dark ? .white : .black.opacity(0.85))
 
                             if assignment.status == .answered {
                                 HStack(spacing: Theme.Spacing.xxs) {
