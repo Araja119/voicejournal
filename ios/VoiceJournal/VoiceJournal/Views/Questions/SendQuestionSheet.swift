@@ -137,7 +137,7 @@ struct SendQuestionSheet: View {
                             withAnimation { step = .selectJournal }
                         }) {
                             HStack(spacing: Theme.Spacing.md) {
-                                AvatarView(name: person.name, size: 48, colors: colors)
+                                AvatarView(name: person.name, imageURL: person.profilePhotoUrl, size: 48, colors: colors)
 
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(person.name)
@@ -309,7 +309,7 @@ struct SendQuestionSheet: View {
                             .font(AppTypography.bodyMedium)
                             .foregroundColor(colors.textSecondary)
 
-                        AvatarView(name: person.name, size: 24, colors: colors)
+                        AvatarView(name: person.name, imageURL: person.profilePhotoUrl, size: 24, colors: colors)
 
                         Text(person.name)
                             .font(AppTypography.labelLarge)
@@ -420,7 +420,7 @@ struct CreateJournalForPersonSheet: View {
                     VStack(spacing: Theme.Spacing.lg) {
                         // Person header
                         HStack(spacing: Theme.Spacing.md) {
-                            AvatarView(name: person.name, size: 48, colors: colors)
+                            AvatarView(name: person.name, imageURL: person.profilePhotoUrl, size: 48, colors: colors)
 
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Creating journal for")

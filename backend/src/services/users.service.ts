@@ -3,6 +3,67 @@ import { NotFoundError } from '../utils/errors.js';
 import { uploadProfilePhoto } from '../mocks/storage.js';
 import type { UpdateUserInput, PushTokenInput } from '../validators/users.validators.js';
 
+/**
+ * Link all "self" relationship Person records to their owner User accounts
+ * and sync the user's profile photo to them.
+ * This runs on startup to fix any unlinked self-persons.
+ */
+export async function syncSelfPersonsWithUsers(): Promise<void> {
+  try {
+    // Find all persons with relationship "self" or "myself" that don't have a linkedUserId
+    const selfPersons = await prisma.person.findMany({
+      where: {
+        relationship: { in: ['self', 'Self', 'myself', 'Myself'] },
+        linkedUserId: null,
+      },
+      include: {
+        owner: true,
+      },
+    });
+
+    for (const person of selfPersons) {
+      // Link the person to their owner
+      await prisma.person.update({
+        where: { id: person.id },
+        data: {
+          linkedUserId: person.ownerId,
+          // Sync the owner's profile photo and name
+          profilePhotoUrl: person.owner.profilePhotoUrl,
+          name: person.owner.displayName,
+        },
+      });
+      console.log(`Linked self-person "${person.name}" to user ${person.ownerId}`);
+    }
+
+    // Also sync profile photos for already-linked persons (in case user updated their photo before the sync was added)
+    const linkedPersons = await prisma.person.findMany({
+      where: {
+        linkedUserId: { not: null },
+      },
+    });
+
+    for (const person of linkedPersons) {
+      // Fetch the linked user separately since the relation isn't defined in Prisma
+      const linkedUser = await prisma.user.findUnique({
+        where: { id: person.linkedUserId! },
+      });
+
+      if (linkedUser && person.profilePhotoUrl !== linkedUser.profilePhotoUrl) {
+        await prisma.person.update({
+          where: { id: person.id },
+          data: {
+            profilePhotoUrl: linkedUser.profilePhotoUrl,
+            name: linkedUser.displayName,
+          },
+        });
+        console.log(`Synced profile photo for linked person "${person.name}"`);
+      }
+    }
+  } catch (error) {
+    console.error('Error syncing self persons with users:', error);
+  }
+}
+
 export interface UserProfile {
   id: string;
   email: string;
@@ -42,6 +103,14 @@ export async function updateProfile(userId: string, input: UpdateUserInput): Pro
     },
   });
 
+  // Sync name to any Person records linked to this user (e.g., "Myself" person for self-journals)
+  if (input.display_name) {
+    await prisma.person.updateMany({
+      where: { linkedUserId: userId },
+      data: { name: input.display_name },
+    });
+  }
+
   return {
     id: user.id,
     email: user.email,
@@ -60,8 +129,15 @@ export async function updateProfilePhoto(
 ): Promise<{ profile_photo_url: string }> {
   const result = await uploadProfilePhoto(buffer, userId, contentType);
 
+  // Update user's profile photo
   await prisma.user.update({
     where: { id: userId },
+    data: { profilePhotoUrl: result.url },
+  });
+
+  // Also sync profile photo to any Person records linked to this user
+  await prisma.person.updateMany({
+    where: { linkedUserId: userId },
     data: { profilePhotoUrl: result.url },
   });
 

@@ -119,6 +119,8 @@ voicejournal/
 - Questions have states: Draft → Awaiting → Answered
 - Visual timeline with state-based styling (hollow dot for draft, filled for sent, checkmark for answered)
 - **Self-journals**: When dedicated to "Myself", shows "Record Answer" button instead of "Send"
+- **Edit journal**: Menu option to edit title and description
+- **Journals list**: Collapsible person sections with profile photos, pin/star favorites
 
 ### 3. Questions
 - Create questions manually or use AI-suggested questions
@@ -144,6 +146,23 @@ voicejournal/
   - **Replay functionality**: AVAudioPlayer-based playback with animated visualization
   - **Playback controls**: 10-second skip forward/backward buttons with current time display
 - **AudioRecorder**: AVFoundation-based, 3-min max, real-time audio level metering
+- **Recordings List View (RecordingsListView)**:
+  - Collapsible person sections with avatars and recording counts
+  - Quick-play functionality: tap play button for inline playback with progress ring
+  - Tap card background opens full RecordingPlayerView
+  - QuickPlayManager class handles AVPlayer with progress tracking
+
+### 6. Profile Photos
+- **User profile photo**: Set in ProfileEditView, stored in User record
+- **Person profile photos**: Uploaded per-contact, stored in Person record
+- **Automatic sync**: When user updates profile photo, it syncs to any linked Person records (e.g., "Myself" person)
+- **Startup sync**: Backend runs `syncSelfPersonsWithUsers()` on startup to link "self" relationship persons and sync photos
+- Profile photos display in:
+  - Journals list (person sections)
+  - Journal detail (assignments in awaiting/answered states)
+  - Send Question sheet (person selection)
+  - Recordings list (person sections and player)
+  - People list (MyselfCard and PersonCard)
 
 ## Self-Recording Feature (Detailed)
 
@@ -290,6 +309,13 @@ For child views with action menus (like QuestionTimelineCard):
 - [x] Backend route separation (public `/record` vs authenticated `/recordings`)
 - [x] Signed URL generation handles both keys and full URLs
 - [x] 10-second skip controls during playback review in RecordingModal
+- [x] Recordings list with collapsible person sections
+- [x] Quick-play functionality in recordings list (inline AVPlayer)
+- [x] Profile photo sync between User and Person records
+- [x] Profile photos display across all views (journals, recordings, send question)
+- [x] Edit journal title/description via menu
+- [x] Draft badge removed from question timeline cards
+- [x] Startup sync for self-persons (links and syncs profile photos)
 
 ### TODO
 - [ ] "Send to [Name]" button flow - send questions to recipients
@@ -426,4 +452,4 @@ model QuestionAssignment {
 - Backend: `/Users/ARaja/voicejournal/backend/`
 
 ---
-*Last updated: February 2026 - RecordingPlayerView with AppBackground styling, RecordingModal with 10-second skip controls, green "Answered" badge, backend route separation*
+*Last updated: February 2026 - Profile photo sync, collapsible recordings list with quick-play, edit journal feature, profile photos across all views*
