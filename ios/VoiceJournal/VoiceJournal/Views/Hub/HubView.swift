@@ -199,8 +199,15 @@ struct HubView: View {
             .padding(.horizontal, Theme.Spacing.sm)
             .padding(.bottom, Theme.Spacing.md)
         }
-        .background(Color(red: 0.094, green: 0.102, blue: 0.125).opacity(0.80))
-        .cornerRadius(Theme.Radius.lg)
+        .background(
+            RoundedRectangle(cornerRadius: Theme.Radius.lg)
+                .fill(Color(red: 0.094, green: 0.102, blue: 0.125).opacity(0.78))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.Radius.lg)
+                .stroke(Color.white.opacity(0.05), lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(0.35), radius: 12, x: 0, y: 8)
     }
 
     // MARK: - Send Question Card
@@ -234,8 +241,15 @@ struct HubView: View {
                     .foregroundColor(.white.opacity(0.4))
             }
             .padding(Theme.Spacing.md)
-            .background(colors.surface.opacity(0.6))
-            .cornerRadius(Theme.Radius.lg)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.Radius.lg)
+                    .fill(Color(red: 0.094, green: 0.102, blue: 0.125).opacity(0.64))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.Radius.lg)
+                    .stroke(Color.white.opacity(0.05), lineWidth: 1)
+            )
+            .shadow(color: Color.black.opacity(0.35), radius: 12, x: 0, y: 8)
         }
         .buttonStyle(PlainButtonStyle())
     }
@@ -272,8 +286,15 @@ struct HubView: View {
                     .foregroundColor(.white.opacity(0.4))
             }
             .padding(Theme.Spacing.md)
-            .background(colors.surface.opacity(0.5))
-            .cornerRadius(Theme.Radius.lg)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.Radius.lg)
+                    .fill(Color(red: 0.094, green: 0.102, blue: 0.125).opacity(0.64))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.Radius.lg)
+                    .stroke(Color.white.opacity(0.05), lineWidth: 1)
+            )
+            .shadow(color: Color.black.opacity(0.35), radius: 12, x: 0, y: 8)
         }
         .buttonStyle(PlainButtonStyle())
     }
@@ -310,8 +331,15 @@ struct HubView: View {
                     .foregroundColor(.white.opacity(0.4))
             }
             .padding(Theme.Spacing.md)
-            .background(colors.surface.opacity(0.5))
-            .cornerRadius(Theme.Radius.lg)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.Radius.lg)
+                    .fill(Color(red: 0.094, green: 0.102, blue: 0.125).opacity(0.64))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.Radius.lg)
+                    .stroke(Color.white.opacity(0.05), lineWidth: 1)
+            )
+            .shadow(color: Color.black.opacity(0.35), radius: 12, x: 0, y: 8)
         }
         .buttonStyle(PlainButtonStyle())
     }
