@@ -49,7 +49,7 @@ voicejournal/
 │   ├── ViewModels/
 │   │   ├── JournalDetailViewModel.swift
 │   │   ├── PeopleViewModel.swift      # Handles "myself" person detection
-│   │   └── ActivityViewModel.swift
+│   │   └── ActivityViewModel.swift    # In Progress data, carousel sentences, priority sorting
 │   └── Views/
 │       ├── Hub/
 │       │   ├── HubView.swift          # Main home screen
@@ -87,6 +87,7 @@ voicejournal/
     │   │   └── recordings.routes.ts   # Exports router + recordPublicRouter
     │   ├── services/
     │   │   ├── auth.service.ts
+    │   │   ├── users.service.ts       # syncSelfPersonsWithUsers() runs at startup
     │   │   ├── journals.service.ts    # Returns linkedUserId for self-detection
     │   │   ├── questions.service.ts
     │   │   ├── ai.service.ts          # Claude API for suggested questions
@@ -103,15 +104,18 @@ voicejournal/
 ## Key Features
 
 ### 1. Home Screen (HubView)
-- Welcome header with rotating intent phrases
-- Primary action: "Send Question"
-- Secondary action: "New Journal"
-- "In Progress" activity section showing:
-  - Who you're waiting on for responses
-  - Count of questions awaiting responses
-  - Last reply info with relative time
-- Tertiary actions: My People, Latest Recordings
+- Welcome header with user's name
+- **Rotating carousel text**: Data-driven sentences that rotate every 9 seconds with soft 1.8s fade animation
+  - Example sentences: "You're waiting on 2 people today.", "3 stories are waiting to be heard."
+  - Categories: Data-driven (primary), Emotional truths (rare), Action bias (very rare)
+- Primary action: "Send Question" (paperplane icon)
+- **Hybrid "In Progress" panel** with two priority cards:
+  - **Card 1 - Emotional anchor**: Person with oldest unanswered question (psychological weight)
+  - **Card 2 - Momentum win**: Person with recent activity + high response rate (likely success)
+  - Cards remain stable during navigation (cached until meaningful data change)
+- Secondary actions: My People, Latest Recordings
 - Custom background image with atmospheric vignette overlay
+- Note: "New Journal" moved to structural surfaces (Journals list), not on home screen
 
 ### 2. Journals
 - Create journals dedicated to specific people OR yourself (self-journaling)
@@ -191,6 +195,49 @@ This two-pronged check handles both:
 3. Audio loads via signed `audioUrl` → AVPlayer streams
 4. User can play/pause, skip ±15s
 5. **UI**: AppBackground, prominent white question text in quotes, enhanced waveform visualization
+
+## Home Screen Redesign (Retention-Focused)
+
+### Design Philosophy
+The home screen is designed as a "guilt + curiosity engine" that creates emotional pull to engage with the app daily. Every element surfaces meaningful loose ends that create psychological weight.
+
+### Carousel Text System
+- **Timer**: Rotates every 9 seconds with 1.8s ease-in-out fade animation
+- **Sentence Categories**:
+  1. **Data-driven (primary weight)**: "You're waiting on X people today", "X stories are waiting to be heard"
+  2. **Emotional truths (rare)**: "Every question becomes a memory", "Some stories only they can tell"
+  3. **Action bias (very rare)**: "Today is a good day to ask"
+- **Implementation**: `ActivityViewModel.carouselText(at:)` and `nextCarouselIndex(current:)`
+- **UI Stability**: Uses `.id(currentCarouselIndex)` with `.transition(.opacity)` for smooth text changes
+
+### Hybrid In Progress Panel
+Two cards optimized for different psychological triggers:
+
+**Card 1 - Emotional Anchor (Oldest Unanswered)**
+- Person with the oldest unanswered question
+- Creates guilt/responsibility feeling
+- Sorted by `oldestUnansweredDate` ascending
+
+**Card 2 - Momentum Win (Recent + High Response Rate)**
+- Person with recent activity AND good response history
+- Creates "easy win" feeling to build momentum
+- Sorted by `lastReplyDate` descending, filtered by response rate
+
+### UI Stability Pattern
+Cards remain stable during navigation to prevent jarring changes:
+```swift
+@State private var hasLoadedOnce = false
+// Private cached cards only update on meaningful changes
+private var loadedCardOne: InProgressItem?
+private var loadedCardTwo: InProgressItem?
+```
+
+### ActivityViewModel Key Properties
+- `inProgressItems: [InProgressItem]` - All people with pending questions
+- `peopleOwingStoriesCount: Int` - Count for carousel sentences
+- `totalUnansweredCount: Int` - Total pending questions
+- `cardOneItem: InProgressItem?` - Cached emotional anchor card
+- `cardTwoItem: InProgressItem?` - Cached momentum win card
 
 ## Design System
 
@@ -316,6 +363,11 @@ For child views with action menus (like QuestionTimelineCard):
 - [x] Edit journal title/description via menu
 - [x] Draft badge removed from question timeline cards
 - [x] Startup sync for self-persons (links and syncs profile photos)
+- [x] Home screen redesign with retention-focused approach
+- [x] Rotating carousel text with data-driven sentences (9s interval, 1.8s fade)
+- [x] Hybrid In Progress panel (emotional anchor + momentum win cards)
+- [x] Stable card caching to prevent UI glitches during navigation
+- [x] "New Journal" moved from home screen to Journals list
 
 ### TODO
 - [ ] "Send to [Name]" button flow - send questions to recipients
@@ -452,4 +504,4 @@ model QuestionAssignment {
 - Backend: `/Users/ARaja/voicejournal/backend/`
 
 ---
-*Last updated: February 2026 - Profile photo sync, collapsible recordings list with quick-play, edit journal feature, profile photos across all views*
+*Last updated: February 2026 - Home screen redesign with carousel text and hybrid In Progress panel, profile photo sync, collapsible recordings list with quick-play, edit journal feature*

@@ -6,24 +6,16 @@ struct HubView: View {
     @Environment(\.colorScheme) var colorScheme
     @StateObject private var activityViewModel = ActivityViewModel()
     @State private var showingSettings = false
-    @State private var showingNewJournal = false
     @State private var showingSendQuestion = false
     @State private var showingPeople = false
     @State private var showingRecordings = false
     @State private var showingJournals = false
-    @State private var pendingJournalId: String?
     @State private var navigateToJournalId: String?
-    @State private var activityJournalId: String?
+    @State private var hasLoadedOnce = false
 
-    // Intent phrases - rotates to keep it fresh
-    private let intentPhrases = [
-        "Who do you want to hear from today?",
-        "Let's capture a story.",
-        "What memory matters right now?",
-        "A question can unlock a lifetime."
-    ]
-
-    @State private var currentIntentIndex = 0
+    // Carousel state
+    @State private var currentCarouselIndex = 0
+    @State private var carouselTimer: Timer?
 
     var body: some View {
         let colors = AppColors(colorScheme)
@@ -38,22 +30,20 @@ struct HubView: View {
                         topBar(colors: colors)
 
                         VStack(spacing: Theme.Spacing.lg) {
-                            // Welcome Header with intent
+                            // Welcome Header with carousel
                             welcomeHeader(colors: colors)
 
-                            // Primary Action - THE one action
-                            primaryAction(colors: colors)
-
-                            // Secondary Action
-                            secondaryAction(colors: colors)
-
-                            // Activity / Continuity section (after New Journal)
-                            if activityViewModel.hasActivity {
-                                activitySection(colors: colors)
+                            // In Progress Panel - THE CORE (hybrid approach)
+                            if activityViewModel.hasInProgressItems {
+                                inProgressPanel(colors: colors)
                             }
 
-                            // Tertiary Actions (at bottom)
-                            tertiaryActions(colors: colors)
+                            // Primary Action - Send Question
+                            sendQuestionCard(colors: colors)
+
+                            // Secondary Actions
+                            myPeopleCard(colors: colors)
+                            latestRecordingsCard(colors: colors)
                         }
                         .padding(.horizontal, Theme.Spacing.lg)
                         .padding(.top, Theme.Spacing.md)
@@ -67,23 +57,7 @@ struct HubView: View {
                     .environmentObject(appState)
                     .preferredColorScheme(appState.colorScheme)
             }
-            .sheet(isPresented: $showingNewJournal, onDismiss: {
-                if let journalId = pendingJournalId {
-                    pendingJournalId = nil
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        navigateToJournalId = journalId
-                    }
-                }
-            }) {
-                CreateJournalSheet(onCreate: { journal in
-                    pendingJournalId = journal.id
-                })
-                .environmentObject(appState)
-            }
             .navigationDestination(item: $navigateToJournalId) { journalId in
-                JournalDetailView(journalId: journalId)
-            }
-            .navigationDestination(item: $activityJournalId) { journalId in
                 JournalDetailView(journalId: journalId)
             }
             .fullScreenCover(isPresented: $showingPeople) {
@@ -99,11 +73,30 @@ struct HubView: View {
             .sheet(isPresented: $showingSendQuestion) {
                 SendQuestionSheet()
             }
-            .onAppear {
-                currentIntentIndex = Int.random(in: 0..<intentPhrases.count)
-            }
             .task {
+                // Only load once to prevent glitching on navigation back
+                if !hasLoadedOnce {
+                    await activityViewModel.loadActivity()
+                    hasLoadedOnce = true
+                    startCarouselTimer()
+                }
+            }
+            .refreshable {
                 await activityViewModel.loadActivity()
+            }
+            .onDisappear {
+                // Don't stop timer - keep it running
+            }
+        }
+    }
+
+    // MARK: - Carousel Timer
+    private func startCarouselTimer() {
+        carouselTimer?.invalidate()
+        carouselTimer = Timer.scheduledTimer(withTimeInterval: 9.0, repeats: true) { _ in
+            // Slow, gentle fade for a soft, warm feel
+            withAnimation(.easeInOut(duration: 1.8)) {
+                currentCarouselIndex = activityViewModel.nextCarouselIndex(current: currentCarouselIndex)
             }
         }
     }
@@ -115,7 +108,7 @@ struct HubView: View {
             Button(action: { showingJournals = true }) {
                 Image(systemName: "line.3.horizontal")
                     .font(.system(size: 20, weight: .medium))
-                    .foregroundColor(colors.textPrimary.opacity(0.7))
+                    .foregroundColor(.white.opacity(0.8))
                     .frame(width: 44, height: 44)
             }
 
@@ -124,233 +117,539 @@ struct HubView: View {
             Button(action: { showingSettings = true }) {
                 Image(systemName: "gearshape")
                     .font(.system(size: 20, weight: .medium))
-                    .foregroundColor(colors.textPrimary.opacity(0.7))
+                    .foregroundColor(.white.opacity(0.8))
                     .frame(width: 44, height: 44)
             }
         }
         .padding(.horizontal, Theme.Spacing.sm)
     }
 
-    // MARK: - Welcome Header
+    // MARK: - Welcome Header with Carousel
     @ViewBuilder
     private func welcomeHeader(colors: AppColors) -> some View {
-        let shadowColor = colorScheme == .dark ? Color.black.opacity(0.6) : Color.black.opacity(0.25)
-        let strongShadow = colorScheme == .dark ? Color.black.opacity(0.7) : Color.black.opacity(0.3)
+        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+            Text("Welcome back,")
+                .font(.system(size: 20, weight: .regular))
+                .foregroundColor(.white.opacity(0.85))
 
-        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-            VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
-                Text("Welcome back,")
-                    .font(AppTypography.bodyLarge)
-                    .foregroundColor(colors.textPrimary)
-                    .shadow(color: shadowColor, radius: 3, x: 0, y: 1)
-                    .shadow(color: shadowColor, radius: 6, x: 0, y: 2)
+            Text(appState.currentUser?.displayName ?? "Friend")
+                .font(.system(size: 34, weight: .bold))
+                .foregroundColor(.white)
 
-                Text(appState.currentUser?.displayName ?? "Friend")
-                    .font(AppTypography.displayMedium)
-                    .foregroundColor(colors.textPrimary)
-                    .shadow(color: strongShadow, radius: 4, x: 0, y: 2)
-                    .shadow(color: strongShadow, radius: 8, x: 0, y: 3)
-            }
-
-            Text(intentPhrases[currentIntentIndex])
-                .font(AppTypography.bodyMedium)
-                .foregroundColor(colors.textPrimary.opacity(0.85))
-                .shadow(color: shadowColor, radius: 3, x: 0, y: 1)
-                .shadow(color: shadowColor, radius: 6, x: 0, y: 2)
+            // Carousel text - observant, not instructive
+            // Soft, gradual fade between sentences
+            Text(activityViewModel.carouselText(at: currentCarouselIndex))
+                .font(.system(size: 16, weight: .medium))
+                .foregroundColor(.white.opacity(0.7))
+                .padding(.top, Theme.Spacing.xxs)
+                .id(currentCarouselIndex)
+                .transition(.opacity.animation(.easeInOut(duration: 1.8)))
+                .animation(.easeInOut(duration: 1.8), value: currentCarouselIndex)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.top, Theme.Spacing.sm)
         .padding(.bottom, Theme.Spacing.sm)
     }
 
-    // MARK: - Primary Action
+    // MARK: - In Progress Panel
     @ViewBuilder
-    private func primaryAction(colors: AppColors) -> some View {
-        HubActionCard(
-            title: "Send Question",
-            subtitle: "Prompt a meaningful memory",
-            icon: "paperplane.fill",
-            accentColor: colors.accentPrimary,
-            colors: colors,
-            prominence: .primary
-        ) {
-            showingSendQuestion = true
-        }
-    }
+    private func inProgressPanel(colors: AppColors) -> some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+            // Section header
+            HStack(spacing: Theme.Spacing.sm) {
+                Image(systemName: "clock.arrow.circlepath")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(colors.accentSecondary)
 
-    // MARK: - Secondary Action
-    @ViewBuilder
-    private func secondaryAction(colors: AppColors) -> some View {
-        HubActionCard(
-            title: "New Journal",
-            subtitle: "Start a living story",
-            icon: "book.fill",
-            accentColor: colors.accentSecondary,
-            colors: colors,
-            prominence: .standard
-        ) {
-            showingNewJournal = true
-        }
-    }
+                Text("In Progress")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.9))
 
-    // MARK: - Tertiary Actions
-    @ViewBuilder
-    private func tertiaryActions(colors: AppColors) -> some View {
-        VStack(spacing: Theme.Spacing.sm) {
-            SecondaryActionRow(
-                title: "My People",
-                subtitle: "The voices that matter",
-                icon: "person.2.fill",
-                colors: colors
-            ) {
-                showingPeople = true
+                Spacer()
             }
+            .padding(.horizontal, Theme.Spacing.md)
+            .padding(.top, Theme.Spacing.md)
 
-            SecondaryActionRow(
-                title: "Latest Recordings",
-                subtitle: "Listen back",
-                icon: "waveform",
-                colors: colors
-            ) {
-                showingRecordings = true
-            }
-        }
-    }
-
-    // MARK: - Activity Section (Continuity)
-    @ViewBuilder
-    private func activitySection(colors: AppColors) -> some View {
-        let shadowColor = colorScheme == .dark ? Color.black.opacity(0.5) : Color.black.opacity(0.2)
-
-        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-            // Section label
-            Text("In progress")
-                .font(AppTypography.caption)
-                .foregroundColor(colors.textPrimary.opacity(0.6))
-                .shadow(color: shadowColor, radius: 2, x: 0, y: 1)
-
-            // Activity card - entire card is tappable
-            if let journalId = activityViewModel.waitingOnJournalId {
-                Button(action: {
-                    activityJournalId = journalId
-                }) {
-                    activityCardContent(colors: colors)
+            // Story cards - stable references
+            VStack(spacing: Theme.Spacing.sm) {
+                // Card 1: Most meaningful loose end
+                if let looseEnd = activityViewModel.cardOne {
+                    InProgressCardStyled(
+                        item: looseEnd,
+                        cardType: .waiting,
+                        colors: colors,
+                        onTap: {
+                            navigateToJournalId = looseEnd.journalId
+                        }
+                    )
                 }
-                .buttonStyle(PlainButtonStyle())
-            } else {
-                activityCardContent(colors: colors)
+
+                // Card 2: Continue story (different person or different journal)
+                if let continueStory = activityViewModel.cardTwo {
+                    InProgressCardStyled(
+                        item: continueStory,
+                        cardType: .continue,
+                        colors: colors,
+                        onTap: {
+                            navigateToJournalId = continueStory.journalId
+                        }
+                    )
+                }
             }
+            .padding(.horizontal, Theme.Spacing.sm)
+            .padding(.bottom, Theme.Spacing.md)
         }
+        .background(colors.surface.opacity(0.5))
+        .cornerRadius(Theme.Radius.lg)
     }
 
-    // MARK: - Activity Card Content
+    // MARK: - Send Question Card
     @ViewBuilder
-    private func activityCardContent(colors: AppColors) -> some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-            // Waiting on row
-            if let waitingOn = activityViewModel.waitingOnName {
-                HStack(spacing: Theme.Spacing.sm) {
-                    Image(systemName: "clock")
+    private func sendQuestionCard(colors: AppColors) -> some View {
+        Button(action: { showingSendQuestion = true }) {
+            HStack(spacing: Theme.Spacing.md) {
+                Circle()
+                    .fill(colors.accentPrimary.opacity(0.2))
+                    .frame(width: 48, height: 48)
+                    .overlay(
+                        Image(systemName: "paperplane.fill")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundColor(colors.accentPrimary)
+                    )
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Send Question")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(.white)
+
+                    Text("Prompt a meaningful memory")
                         .font(.system(size: 14))
-                        .foregroundColor(colors.accentSecondary)
-
-                    Text("Waiting on \(waitingOn)")
-                        .font(AppTypography.bodyMedium)
-                        .foregroundColor(colors.textPrimary)
-
-                    Spacer()
-
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(colors.textSecondary.opacity(0.5))
+                        .foregroundColor(.white.opacity(0.6))
                 }
-            }
 
-            if activityViewModel.awaitingCount > 0 {
-                Text("\(activityViewModel.awaitingCount) question\(activityViewModel.awaitingCount == 1 ? "" : "s") awaiting responses")
-                    .font(AppTypography.caption)
-                    .foregroundColor(colors.textSecondary)
-            }
+                Spacer()
 
-            // Last reply info
-            if let lastReply = activityViewModel.lastReplyInfo {
-                HStack(spacing: Theme.Spacing.xs) {
-                    Image(systemName: "waveform")
-                        .font(.system(size: 12))
-                        .foregroundColor(colors.accentPrimary.opacity(0.7))
-
-                    Text(lastReply)
-                        .font(AppTypography.caption)
-                        .foregroundColor(colors.textSecondary)
-                }
-                .padding(.top, Theme.Spacing.xxs)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.4))
             }
+            .padding(Theme.Spacing.md)
+            .background(colors.surface.opacity(0.6))
+            .cornerRadius(Theme.Radius.lg)
         }
-        .padding(Theme.Spacing.md)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: Theme.Radius.md)
-                .fill(colors.surface.opacity(colorScheme == .dark ? 0.45 : 0.65))
-        )
-        .contentShape(Rectangle())
+        .buttonStyle(PlainButtonStyle())
+    }
+
+    // MARK: - My People Card
+    @ViewBuilder
+    private func myPeopleCard(colors: AppColors) -> some View {
+        Button(action: { showingPeople = true }) {
+            HStack(spacing: Theme.Spacing.md) {
+                ZStack {
+                    Circle()
+                        .fill(colors.textSecondary.opacity(0.15))
+                        .frame(width: 48, height: 48)
+
+                    Image(systemName: "person.2.fill")
+                        .font(.system(size: 18))
+                        .foregroundColor(.white.opacity(0.7))
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("My People")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(.white)
+
+                    Text("The voices that matter")
+                        .font(.system(size: 14))
+                        .foregroundColor(.white.opacity(0.6))
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.4))
+            }
+            .padding(Theme.Spacing.md)
+            .background(colors.surface.opacity(0.5))
+            .cornerRadius(Theme.Radius.lg)
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+
+    // MARK: - Latest Recordings Card
+    @ViewBuilder
+    private func latestRecordingsCard(colors: AppColors) -> some View {
+        Button(action: { showingRecordings = true }) {
+            HStack(spacing: Theme.Spacing.md) {
+                ZStack {
+                    Circle()
+                        .fill(colors.textSecondary.opacity(0.15))
+                        .frame(width: 48, height: 48)
+
+                    Image(systemName: "waveform")
+                        .font(.system(size: 18))
+                        .foregroundColor(.white.opacity(0.7))
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Latest Recordings")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(.white)
+
+                    Text("Listen back")
+                        .font(.system(size: 14))
+                        .foregroundColor(.white.opacity(0.6))
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.4))
+            }
+            .padding(Theme.Spacing.md)
+            .background(colors.surface.opacity(0.5))
+            .cornerRadius(Theme.Radius.lg)
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
+
+// MARK: - In Progress Card (Mockup Style with Avatar)
+struct InProgressCardStyled: View {
+    enum CardType {
+        case waiting
+        case `continue`
+    }
+
+    let item: InProgressItem
+    let cardType: CardType
+    let colors: AppColors
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: Theme.Spacing.md) {
+                // Avatar with profile photo
+                AvatarView(
+                    name: item.personName,
+                    imageURL: item.personPhotoUrl,
+                    size: 44,
+                    colors: colors
+                )
+
+                // Content
+                VStack(alignment: .leading, spacing: 3) {
+                    // Primary line
+                    Text(item.primaryText)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.white)
+
+                    // Secondary line
+                    Text(item.secondaryText)
+                        .font(.system(size: 13))
+                        .foregroundColor(.white.opacity(0.6))
+
+                    // Tertiary line (if available)
+                    if let tertiaryText = item.tertiaryText {
+                        Text(tertiaryText)
+                            .font(.system(size: 12))
+                            .foregroundColor(.white.opacity(0.5))
+                    }
+                }
+
+                Spacer()
+
+                // Chevron
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.3))
+            }
+            .padding(Theme.Spacing.md)
+            .background(colors.surface.opacity(0.4))
+            .cornerRadius(Theme.Radius.md)
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
+
+// MARK: - In Progress Item Model
+struct InProgressItem: Identifiable, Equatable {
+    let id: String
+    let personId: String
+    let personName: String
+    let personPhotoUrl: String?
+    let journalId: String
+    let journalTitle: String
+    let primaryText: String
+    let secondaryText: String
+    let tertiaryText: String?
+    let unansweredCount: Int
+    let oldestUnansweredDate: Date?
+    let lastActivityDate: Date?
+    let responseRate: Double
+
+    static func == (lhs: InProgressItem, rhs: InProgressItem) -> Bool {
+        lhs.id == rhs.id
     }
 }
 
 // MARK: - Activity View Model
 @MainActor
 class ActivityViewModel: ObservableObject {
-    @Published var waitingOnName: String?
-    @Published var waitingOnJournalId: String?
-    @Published var awaitingCount: Int = 0
-    @Published var lastReplyInfo: String?
-    @Published var lastReplyJournalId: String?
+    @Published var peopleOwingStoriesCount: Int = 0
+    @Published var totalUnansweredCount: Int = 0
+    @Published var cardOne: InProgressItem?
+    @Published var cardTwo: InProgressItem?
+    @Published var lastReplyTimeAgo: String?
+    @Published var longestWaitingPersonName: String?
 
-    var hasActivity: Bool {
-        waitingOnName != nil || awaitingCount > 0 || lastReplyInfo != nil
+    // Stable storage to prevent glitching
+    private var loadedCardOne: InProgressItem?
+    private var loadedCardTwo: InProgressItem?
+
+    var hasInProgressItems: Bool {
+        cardOne != nil
     }
 
+    // MARK: - Carousel Logic
+
+    /// Approved carousel sentences with weighted distribution
+    func carouselText(at index: Int) -> String {
+        let sentences = buildCarouselSentences()
+        guard !sentences.isEmpty else { return "" }
+        return sentences[index % sentences.count]
+    }
+
+    func nextCarouselIndex(current: Int) -> Int {
+        let sentences = buildCarouselSentences()
+        guard sentences.count > 1 else { return 0 }
+        return (current + 1) % sentences.count
+    }
+
+    private func buildCarouselSentences() -> [String] {
+        var sentences: [String] = []
+
+        // Data-driven (primary weight - these appear more often)
+        if peopleOwingStoriesCount > 0 {
+            sentences.append("You're waiting on \(peopleOwingStoriesCount) \(peopleOwingStoriesCount == 1 ? "person" : "people") today.")
+        }
+        if totalUnansweredCount > 0 {
+            sentences.append("\(totalUnansweredCount) \(totalUnansweredCount == 1 ? "story is" : "stories are") waiting to be heard.")
+        }
+        if peopleOwingStoriesCount > 0 {
+            sentences.append("\(peopleOwingStoriesCount) \(peopleOwingStoriesCount == 1 ? "conversation is" : "conversations are") still open.")
+        }
+        if let timeAgo = lastReplyTimeAgo {
+            sentences.append("Last reply was \(timeAgo).")
+        }
+        if let name = longestWaitingPersonName {
+            sentences.append("You haven't heard from \(name) in a while.")
+        }
+        if let journal = cardOne?.journalTitle {
+            sentences.append("\"\(journal)\" is still waiting.")
+        }
+
+        // Emotional truths (sprinkled in - rare)
+        sentences.append("Every question becomes a memory.")
+        sentences.append("Some stories only they can tell.")
+
+        // Action bias (very rare)
+        sentences.append("Today is a good day to ask.")
+
+        // If no data, use emotional/action only
+        if sentences.count < 3 {
+            sentences.append("Memories fade. Voices don't.")
+            sentences.append("One question can change what you remember.")
+            sentences.append("A story is waiting.")
+        }
+
+        return sentences
+    }
+
+    // MARK: - Load Activity
+
     func loadActivity() async {
-        // Load journals to compute activity
         do {
             let journals = try await JournalService.shared.listJournals()
+            let recordingsResponse = try await RecordingService.shared.listRecordings()
+            let recordings = recordingsResponse.recordings
 
-            var totalAwaiting = 0
-            var mostRecentWaiting: (name: String, journalId: String, date: Date)?
+            // Build per-person activity data
+            var personActivityMap: [String: PersonActivityData] = [:]
+            var totalUnanswered = 0
 
             for journal in journals {
-                // Count awaiting
-                let awaiting = journal.questionCount - journal.answeredCount
-                totalAwaiting += awaiting
+                guard let person = journal.dedicatedToPerson else { continue }
+                if person.isSelf { continue }
 
-                // Track who we're waiting on (most recent)
-                if awaiting > 0, let person = journal.dedicatedToPerson {
-                    if mostRecentWaiting == nil || journal.createdAt > mostRecentWaiting!.date {
-                        mostRecentWaiting = (person.name, journal.id, journal.createdAt)
-                    }
-                }
+                let unansweredCount = journal.questionCount - journal.answeredCount
+                if unansweredCount <= 0 { continue }
+
+                totalUnanswered += unansweredCount
+
+                var personData = personActivityMap[person.id] ?? PersonActivityData(
+                    personId: person.id,
+                    personName: person.name,
+                    personPhotoUrl: person.profilePhotoUrl
+                )
+
+                personData.journalsWithUnanswered.append(JournalActivityData(
+                    journalId: journal.id,
+                    journalTitle: journal.title,
+                    unansweredCount: unansweredCount,
+                    createdAt: journal.createdAt
+                ))
+
+                personData.totalUnanswered += unansweredCount
+                personActivityMap[person.id] = personData
             }
 
-            // Load recent recordings for last reply info
-            let recordingsResponse = try await RecordingService.shared.listRecordings()
-            if let latestRecording = recordingsResponse.recordings.first,
-               let person = latestRecording.person,
+            // Calculate last reply time
+            if let latestRecording = recordings.first,
                let recordedAt = latestRecording.recordedAt {
                 let formatter = RelativeDateTimeFormatter()
                 formatter.unitsStyle = .short
-                let relativeTime = formatter.localizedString(for: recordedAt, relativeTo: Date())
-                lastReplyInfo = "Last reply from \(person.name) — \(relativeTime)"
-                lastReplyJournalId = latestRecording.journal?.id
+                lastReplyTimeAgo = formatter.localizedString(for: recordedAt, relativeTo: Date())
             }
 
-            awaitingCount = totalAwaiting
-            waitingOnName = mostRecentWaiting?.name
-            waitingOnJournalId = mostRecentWaiting?.journalId
+            // Track response rates
+            var personRecordingCounts: [String: (total: Int, recent: Date?)] = [:]
+            for recording in recordings {
+                guard let person = recording.person else { continue }
+                var data = personRecordingCounts[person.id] ?? (total: 0, recent: nil)
+                data.total += 1
+                if let recordedAt = recording.recordedAt {
+                    if data.recent == nil || recordedAt > data.recent! {
+                        data.recent = recordedAt
+                    }
+                }
+                personRecordingCounts[person.id] = data
+            }
+
+            // Build items sorted by oldest first
+            var items: [InProgressItem] = []
+
+            for (personId, personData) in personActivityMap {
+                guard let oldestJournal = personData.journalsWithUnanswered.min(by: { $0.createdAt < $1.createdAt }) else { continue }
+
+                let recordingData = personRecordingCounts[personId]
+
+                let item = InProgressItem(
+                    id: "\(personId)-\(oldestJournal.journalId)",
+                    personId: personId,
+                    personName: personData.personName,
+                    personPhotoUrl: personData.personPhotoUrl,
+                    journalId: oldestJournal.journalId,
+                    journalTitle: oldestJournal.journalTitle,
+                    primaryText: "Waiting on \(personData.personName)",
+                    secondaryText: "\(personData.totalUnanswered) \(personData.totalUnanswered == 1 ? "question" : "questions") awaiting responses",
+                    tertiaryText: formatLastReply(recordingData?.recent, personName: personData.personName),
+                    unansweredCount: personData.totalUnanswered,
+                    oldestUnansweredDate: oldestJournal.createdAt,
+                    lastActivityDate: recordingData?.recent,
+                    responseRate: calculateResponseRate(
+                        totalSent: personData.totalUnanswered + (recordingData?.total ?? 0),
+                        totalAnswered: recordingData?.total ?? 0
+                    )
+                )
+
+                items.append(item)
+            }
+
+            // Sort by oldest unanswered (most meaningful loose end first)
+            items.sort { item1, item2 in
+                guard let date1 = item1.oldestUnansweredDate,
+                      let date2 = item2.oldestUnansweredDate else { return false }
+                return date1 < date2
+            }
+
+            // Update counts
+            peopleOwingStoriesCount = items.count
+            totalUnansweredCount = totalUnanswered
+            longestWaitingPersonName = items.first?.personName
+
+            // Only update cards if we haven't loaded yet OR if data meaningfully changed
+            if loadedCardOne == nil || hasDataChanged(newItems: items) {
+                loadedCardOne = items.first
+                loadedCardTwo = items.count > 1 ? createContinueCard(from: items[1]) : nil
+            }
+
+            cardOne = loadedCardOne
+            cardTwo = loadedCardTwo
 
         } catch {
-            // Silently fail - activity section just won't show
             print("Failed to load activity: \(error)")
         }
     }
+
+    private func hasDataChanged(newItems: [InProgressItem]) -> Bool {
+        // Check if the primary card person changed
+        if let currentFirst = loadedCardOne,
+           let newFirst = newItems.first {
+            return currentFirst.personId != newFirst.personId ||
+                   currentFirst.unansweredCount != newFirst.unansweredCount
+        }
+        return true
+    }
+
+    private func createContinueCard(from item: InProgressItem) -> InProgressItem {
+        // Transform to "Continue" style
+        return InProgressItem(
+            id: item.id + "-continue",
+            personId: item.personId,
+            personName: item.personName,
+            personPhotoUrl: item.personPhotoUrl,
+            journalId: item.journalId,
+            journalTitle: item.journalTitle,
+            primaryText: "Continue \(item.journalTitle)",
+            secondaryText: formatContinueSubtitle(item),
+            tertiaryText: nil,
+            unansweredCount: item.unansweredCount,
+            oldestUnansweredDate: item.oldestUnansweredDate,
+            lastActivityDate: item.lastActivityDate,
+            responseRate: item.responseRate
+        )
+    }
+
+    private func formatContinueSubtitle(_ item: InProgressItem) -> String {
+        if let lastActivity = item.lastActivityDate {
+            let formatter = RelativeDateTimeFormatter()
+            formatter.unitsStyle = .short
+            return "Answered \(formatter.localizedString(for: lastActivity, relativeTo: Date()))"
+        }
+        return "\(item.unansweredCount) awaiting"
+    }
+
+    private func formatLastReply(_ date: Date?, personName: String) -> String? {
+        guard let date = date else { return nil }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .short
+        return "Last reply from \(personName) — \(formatter.localizedString(for: date, relativeTo: Date()))"
+    }
+
+    private func calculateResponseRate(totalSent: Int, totalAnswered: Int) -> Double {
+        guard totalSent > 0 else { return 0.5 }
+        return Double(totalAnswered) / Double(totalSent)
+    }
+}
+
+// MARK: - Helper Types
+private struct PersonActivityData {
+    let personId: String
+    let personName: String
+    let personPhotoUrl: String?
+    var journalsWithUnanswered: [JournalActivityData] = []
+    var totalUnanswered: Int = 0
+}
+
+private struct JournalActivityData {
+    let journalId: String
+    let journalTitle: String
+    let unansweredCount: Int
+    let createdAt: Date
 }
 
 // MARK: - Preview
