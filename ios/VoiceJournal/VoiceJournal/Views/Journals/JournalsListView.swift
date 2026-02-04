@@ -223,10 +223,6 @@ struct PersonJournalSection: View {
         return journalText
     }
 
-    private var dividerColor: Color {
-        colorScheme == .dark ? Color.white.opacity(0.06) : Color.black.opacity(0.06)
-    }
-
     var body: some View {
         let textColors = GlassTextColors(colorScheme: colorScheme)
 
@@ -268,42 +264,26 @@ struct PersonJournalSection: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
 
-            // Journals inside the same container
+            // Journals inside the same container - NO dividers, spacing creates separation
             if !isCollapsed {
-                // Divider between header and journals
-                Rectangle()
-                    .fill(dividerColor)
-                    .frame(height: 1)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 4)
-
-                VStack(spacing: 0) {
-                    ForEach(Array(section.journals.enumerated()), id: \.element.id) { index, journal in
+                VStack(spacing: 4) {  // Spacing instead of divider lines
+                    ForEach(section.journals, id: \.id) { journal in
                         NavigationLink {
                             JournalDetailView(journalId: journal.id, onDelete: onDelete)
                         } label: {
                             CompactJournalCard(journal: journal, colors: colors)
                         }
                         .buttonStyle(PlainButtonStyle())
-
-                        // Subtle separator between journals (not after last)
-                        if index < section.journals.count - 1 {
-                            Rectangle()
-                                .fill(colorScheme == .dark ? Color.white.opacity(0.04) : Color.black.opacity(0.04))
-                                .frame(height: 1)
-                                .padding(.leading, 60)
-                        }
                     }
                 }
                 .padding(.horizontal, 12)
-                .padding(.top, 8)
-                .padding(.bottom, 8)
+                .padding(.top, 4)
+                .padding(.bottom, 10)
             }
         }
-        .padding(.bottom, 8)
         .glassCard(cornerRadius: 20)
         .padding(.horizontal, Theme.Spacing.lg)
-        .padding(.top, isFirst ? 0 : 24)
+        .padding(.top, isFirst ? 0 : 20)
     }
 }
 
@@ -339,10 +319,6 @@ struct GeneralJournalSection: View {
         return journalText
     }
 
-    private var dividerColor: Color {
-        colorScheme == .dark ? Color.white.opacity(0.06) : Color.black.opacity(0.06)
-    }
-
     var body: some View {
         let textColors = GlassTextColors(colorScheme: colorScheme)
 
@@ -375,40 +351,26 @@ struct GeneralJournalSection: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
 
-            // Journals inside container
+            // Journals inside container - NO dividers, spacing creates separation
             if !isCollapsed {
-                Rectangle()
-                    .fill(dividerColor)
-                    .frame(height: 1)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 4)
-
-                VStack(spacing: 0) {
-                    ForEach(Array(journals.enumerated()), id: \.element.id) { index, journal in
+                VStack(spacing: 4) {  // Spacing instead of divider lines
+                    ForEach(journals, id: \.id) { journal in
                         NavigationLink {
                             JournalDetailView(journalId: journal.id, onDelete: onDelete)
                         } label: {
                             CompactJournalCard(journal: journal, colors: colors)
                         }
                         .buttonStyle(PlainButtonStyle())
-
-                        if index < journals.count - 1 {
-                            Rectangle()
-                                .fill(colorScheme == .dark ? Color.white.opacity(0.04) : Color.black.opacity(0.04))
-                                .frame(height: 1)
-                                .padding(.leading, 60)
-                        }
                     }
                 }
                 .padding(.horizontal, 12)
-                .padding(.top, 8)
-                .padding(.bottom, 8)
+                .padding(.top, 4)
+                .padding(.bottom, 10)
             }
         }
-        .padding(.bottom, 8)
         .glassCard(cornerRadius: 20)
         .padding(.horizontal, Theme.Spacing.lg)
-        .padding(.top, isFirst ? 0 : 24)
+        .padding(.top, isFirst ? 0 : 20)
     }
 }
 
@@ -462,8 +424,8 @@ struct CompactJournalCard: View {
                     coverPlaceholder
                 }
             }
-            .frame(width: 44, height: 44)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .frame(width: 40, height: 40)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
 
             // Info
             VStack(alignment: .leading, spacing: 2) {
@@ -491,14 +453,24 @@ struct CompactJournalCard: View {
         .contentShape(Rectangle())
     }
 
+    // Journal tile icon - solid object that sits ON the glass, not faded into it
     private var coverPlaceholder: some View {
-        Rectangle()
-            .fill(colorScheme == .dark ? Color.white.opacity(0.08) : Color.black.opacity(0.06))
-            .overlay(
-                Image(systemName: "book.fill")
-                    .font(.system(size: 14))
-                    .foregroundColor(colorScheme == .dark ? .white.opacity(0.2) : .black.opacity(0.15))
-            )
+        ZStack {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(colorScheme == .dark
+                    ? Color.white.opacity(0.08)
+                    : Color.black.opacity(0.06))  // Dark fill creates contrast on light glass
+
+            Image(systemName: "book.closed.fill")  // Filled icon, not outline
+                .font(.system(size: 16, weight: .medium))
+                .foregroundColor(colorScheme == .dark
+                    ? .white.opacity(0.35)
+                    : .black.opacity(0.55))  // Strong ink, not faded
+        }
+        .shadow(color: colorScheme == .dark
+            ? .black.opacity(0.15)
+            : .black.opacity(0.08),
+            radius: 4, x: 0, y: 2)  // Micro shadow - tile sits ON glass
     }
 }
 

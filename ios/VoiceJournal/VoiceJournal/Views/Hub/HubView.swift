@@ -186,7 +186,13 @@ struct HubView: View {
                         colors: colors,
                         onTap: {
                             navigateToJournalId = looseEnd.journalId
-                        }
+                        },
+                        onRemindTapped: {
+                            Task {
+                                await activityViewModel.sendRemindForPerson(item: looseEnd, isCardOne: true)
+                            }
+                        },
+                        remindState: activityViewModel.cardOneRemindState
                     )
                 }
 
@@ -314,10 +320,19 @@ struct InProgressCardStyled: View {
         case `continue`
     }
 
+    enum RemindState {
+        case idle
+        case loading
+        case success
+        case error
+    }
+
     let item: InProgressItem
     let cardType: CardType
     let colors: AppColors
     let onTap: () -> Void
+    var onRemindTapped: (() -> Void)?
+    var remindState: RemindState = .idle
 
     private var buttonText: String {
         switch cardType {
@@ -332,8 +347,8 @@ struct InProgressCardStyled: View {
         let textColors = GlassTextColors(colorScheme: colorScheme)
 
         Button(action: onTap) {
-            HStack(spacing: Theme.Spacing.sm) {
-                // Avatar with profile photo
+            HStack(alignment: .center, spacing: Theme.Spacing.sm) {
+                // Avatar
                 AvatarView(
                     name: item.personName,
                     imageURL: item.personPhotoUrl,
@@ -341,27 +356,40 @@ struct InProgressCardStyled: View {
                     colors: colors
                 )
 
-                // Content - give it priority to expand
-                VStack(alignment: .leading, spacing: 2) {
-                    // Primary line - allow 2 lines for longer titles
+                // Content stacked vertically, left-aligned
+                VStack(alignment: .leading, spacing: 3) {
                     Text(item.primaryText)
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(textColors.primary)
                         .lineLimit(2)
-                        .minimumScaleFactor(0.9)
+                        .fixedSize(horizontal: false, vertical: true)
 
-                    // Secondary line
-                    Text(item.secondaryText)
-                        .font(.system(size: 12))
-                        .foregroundColor(textColors.secondary)
-                        .lineLimit(1)
+                    // Subtitle with unanswered count inline
+                    if cardType == .waiting && item.unansweredCount > 0 {
+                        Text("\(item.secondaryText) · \(item.unansweredCount) unanswered")
+                            .font(.system(size: 12))
+                            .foregroundColor(textColors.secondary)
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else {
+                        Text(item.secondaryText)
+                            .font(.system(size: 12))
+                            .foregroundColor(textColors.secondary)
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
-                .layoutPriority(1)
 
                 Spacer(minLength: 8)
 
-                // Golden status pill
-                StatusPill(label: buttonText)
+                // Single right-aligned action
+                if cardType == .waiting, onRemindTapped != nil {
+                    remindActionView
+                        .fixedSize()
+                } else {
+                    StatusPill(label: buttonText)
+                        .fixedSize()
+                }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
@@ -369,6 +397,42 @@ struct InProgressCardStyled: View {
         }
         .buttonStyle(PlainButtonStyle())
     }
+
+    // MARK: - Remind Action (title-row aligned, feels like a button)
+    @ViewBuilder
+    private var remindActionView: some View {
+        switch remindState {
+        case .loading:
+            ProgressView()
+                .progressViewStyle(CircularProgressViewStyle())
+                .scaleEffect(0.6)
+                .frame(height: 28)
+        case .success:
+            Text("Sent!")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(.green)
+                .frame(height: 28)
+        case .error:
+            Text("Failed")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(.red.opacity(0.8))
+                .frame(height: 28)
+        case .idle:
+            Text("Remind")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(.white)
+                .padding(.horizontal, 14)
+                .frame(height: 28)
+                .background(
+                    Capsule()
+                        .fill(colors.accentPrimary)
+                )
+                .onTapGesture {
+                    onRemindTapped?()
+                }
+        }
+    }
+
 }
 
 // MARK: - Status Pill (Golden Gradient - Premium Style)
@@ -476,6 +540,10 @@ class ActivityViewModel: ObservableObject {
     @Published var cardTwo: InProgressItem?
     @Published var lastReplyTimeAgo: String?
     @Published var longestWaitingPersonName: String?
+
+    // Remind state for hub cards
+    @Published var cardOneRemindState: InProgressCardStyled.RemindState = .idle
+    @Published var cardTwoRemindState: InProgressCardStyled.RemindState = .idle
 
     // Stable storage to prevent glitching
     private var loadedCardOne: InProgressItem?
@@ -706,6 +774,84 @@ class ActivityViewModel: ObservableObject {
     private func calculateResponseRate(totalSent: Int, totalAnswered: Int) -> Double {
         guard totalSent > 0 else { return 0.5 }
         return Double(totalAnswered) / Double(totalSent)
+    }
+
+    // MARK: - Hub Remind
+
+    /// Send a remind for a person by fetching their journal detail and finding the oldest eligible assignment
+    func sendRemindForPerson(item: InProgressItem, isCardOne: Bool) async {
+        // Check person cap
+        if let capBlock = RemindCapTracker.shared.canRemindPerson(item.personId) {
+            // Silently block — user already reminded this person recently
+            _ = capBlock
+            return
+        }
+
+        if isCardOne {
+            cardOneRemindState = .loading
+        } else {
+            cardTwoRemindState = .loading
+        }
+
+        do {
+            // Fetch journal detail to get assignments
+            let journal = try await JournalService.shared.getJournal(id: item.journalId)
+
+            // Find oldest eligible assignment for this person
+            var oldestEligible: Assignment?
+            if let questions = journal.questions {
+                for question in questions {
+                    guard let assignments = question.assignments else { continue }
+                    for assignment in assignments where assignment.personId == item.personId {
+                        let eligibility = RemindEligibility.check(assignment)
+                        if eligibility.canRemind {
+                            if oldestEligible == nil || (assignment.sentAt ?? Date()) < (oldestEligible?.sentAt ?? Date()) {
+                                oldestEligible = assignment
+                            }
+                        }
+                    }
+                }
+            }
+
+            guard let assignment = oldestEligible else {
+                // No eligible assignments — no action
+                if isCardOne { cardOneRemindState = .idle }
+                else { cardTwoRemindState = .idle }
+                return
+            }
+
+            // Send the remind
+            let _ = try await QuestionService.shared.sendReminder(
+                assignmentId: assignment.id,
+                channel: .email
+            )
+
+            // Record in cap tracker
+            RemindCapTracker.shared.recordRemind(personId: item.personId)
+
+            // Show success
+            if isCardOne { cardOneRemindState = .success }
+            else { cardTwoRemindState = .success }
+
+            // Reset after 2 seconds
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                if isCardOne { self.cardOneRemindState = .idle }
+                else { self.cardTwoRemindState = .idle }
+            }
+
+            // Reload activity
+            await loadActivity()
+
+        } catch {
+            // Show error briefly
+            if isCardOne { cardOneRemindState = .error }
+            else { cardTwoRemindState = .error }
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                if isCardOne { self.cardOneRemindState = .idle }
+                else { self.cardTwoRemindState = .idle }
+            }
+        }
     }
 }
 

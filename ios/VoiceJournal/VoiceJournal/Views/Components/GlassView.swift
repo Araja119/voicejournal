@@ -4,12 +4,12 @@ import UIKit
 // MARK: - Translucent Blur View (UIKit wrapper for precise blur control)
 struct TranslucentBlurView: UIViewRepresentable {
     let style: UIBlurEffect.Style
-    var intensity: CGFloat = 0.7  // Default intensity
+    var intensity: CGFloat = 0.7
 
     func makeUIView(context: Context) -> UIVisualEffectView {
         let blurEffect = UIBlurEffect(style: style)
         let blurView = UIVisualEffectView(effect: blurEffect)
-        blurView.alpha = intensity  // Reduce to let more background through
+        blurView.alpha = intensity
         return blurView
     }
 
@@ -19,10 +19,9 @@ struct TranslucentBlurView: UIViewRepresentable {
     }
 }
 
-// MARK: - Glass Card Style
-// True frosted glass that works in both light and dark mode
-// Light mode: translucent white glass with background bleed
-// Dark mode: translucent dark glass (existing style)
+// MARK: - Glass Card Style (Primary/Outer containers)
+// Light mode: neutral blur + tiny white tint + shadow + subtle edge
+// Dark mode: translucent dark glass
 
 struct GlassCardModifier: ViewModifier {
     @Environment(\.colorScheme) var colorScheme
@@ -31,9 +30,8 @@ struct GlassCardModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .background(glassBackground)
-            .overlay(borderAndHighlight)
+            .overlay(borderOverlay)
             .shadow(color: primaryShadow, radius: primaryShadowRadius, x: 0, y: primaryShadowY)
-            .shadow(color: ambientShadow, radius: 2, x: 0, y: 1)
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
     }
 
@@ -42,92 +40,53 @@ struct GlassCardModifier: ViewModifier {
     private var glassBackground: some View {
         if colorScheme == .dark {
             ZStack {
-                // Dark mode: material blur + tint
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .fill(.ultraThinMaterial)
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(tintColor)
+                    .fill(Color(red: 0.094, green: 0.102, blue: 0.125).opacity(0.5))
             }
         } else {
-            // Light mode: true frosted glass - background colors clearly visible through blur
+            // Light mode: neutral blur + TINY white tint (0.12, not 0.22)
             ZStack {
-                // Layer 1: Light blur with low intensity for vivid background colors
-                TranslucentBlurView(style: .light, intensity: 0.38)
+                TranslucentBlurView(style: .light, intensity: 0.45)
                     .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-                // Layer 2: Very subtle white diffusion
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(Color.white.opacity(0.22))
+                    .fill(Color.white.opacity(0.12))  // Reduced from 0.22 - removes fog
             }
         }
     }
 
-    // MARK: - Border and Inner Highlight
+    // MARK: - Border (subtle, not drawn)
     @ViewBuilder
-    private var borderAndHighlight: some View {
-        ZStack {
-            // Outer border
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .stroke(borderColor, lineWidth: 1)
-
-            // Inner highlight (top edge glow for glass depth)
-            RoundedRectangle(cornerRadius: cornerRadius - 1, style: .continuous)
-                .stroke(
-                    LinearGradient(
-                        stops: [
-                            .init(color: innerHighlightColor, location: 0),
-                            .init(color: .clear, location: 0.5)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    ),
-                    lineWidth: 1
-                )
-                .padding(1)
-        }
-    }
-
-    // MARK: - Dynamic Colors
-
-    private var tintColor: Color {
-        colorScheme == .dark
-            ? Color(red: 0.094, green: 0.102, blue: 0.125).opacity(0.5)
-            : Color.white.opacity(0.08)  // Very subtle tint to maximize background bleed
+    private var borderOverlay: some View {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            .stroke(borderColor, lineWidth: 1)
     }
 
     private var borderColor: Color {
         colorScheme == .dark
             ? Color.white.opacity(0.05)
-            : Color.white.opacity(0.45)
-    }
-
-    private var innerHighlightColor: Color {
-        colorScheme == .dark
-            ? Color.white.opacity(0.08)
-            : Color.white.opacity(0.6)
+            : Color.white.opacity(0.18)  // Reduced from 0.45 - glass edges are subtle
     }
 
     private var primaryShadow: Color {
         colorScheme == .dark
             ? Color.black.opacity(0.35)
-            : Color.black.opacity(0.10)
+            : Color.black.opacity(0.12)  // Slightly stronger for depth
     }
 
     private var primaryShadowRadius: CGFloat {
-        colorScheme == .dark ? 12 : 18
+        colorScheme == .dark ? 12 : 22  // Larger radius for parent cards
     }
 
     private var primaryShadowY: CGFloat {
-        colorScheme == .dark ? 8 : 10
-    }
-
-    private var ambientShadow: Color {
-        colorScheme == .dark
-            ? Color.black.opacity(0.2)
-            : Color.black.opacity(0.06)
+        colorScheme == .dark ? 8 : 14  // More lift for parent cards
     }
 }
 
-// MARK: - Glass Card Secondary (for inner/nested cards)
+// MARK: - Glass Card Secondary (Inner/nested cards - journal rows)
+// Shallower depth than parent for visual hierarchy
+
 struct GlassCardSecondaryModifier: ViewModifier {
     @Environment(\.colorScheme) var colorScheme
     var cornerRadius: CGFloat = 12
@@ -135,7 +94,6 @@ struct GlassCardSecondaryModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .background(glassBackground)
-            .overlay(border)
             .shadow(color: shadowColor, radius: shadowRadius, x: 0, y: shadowY)
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
     }
@@ -147,53 +105,37 @@ struct GlassCardSecondaryModifier: ViewModifier {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .fill(.ultraThinMaterial)
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(tintColor)
+                    .fill(Color(red: 0.094, green: 0.102, blue: 0.125).opacity(0.25))
             }
         } else {
-            // Light mode: subtle frosted glass for nested cards
+            // Light mode: even subtler for nested cards (0.08 tint)
             ZStack {
-                TranslucentBlurView(style: .light, intensity: 0.32)
+                TranslucentBlurView(style: .light, intensity: 0.35)
                     .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(Color.white.opacity(0.18))
+                    .fill(Color.white.opacity(0.08))  // Less than parent - creates depth
             }
         }
     }
 
-    @ViewBuilder
-    private var border: some View {
-        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-            .stroke(borderColor, lineWidth: 1)
-    }
-
-    private var tintColor: Color {
-        colorScheme == .dark
-            ? Color(red: 0.094, green: 0.102, blue: 0.125).opacity(0.25)
-            : Color.white.opacity(0.05)
-    }
-
-    private var borderColor: Color {
-        colorScheme == .dark
-            ? Color.white.opacity(0.03)
-            : Color.white.opacity(0.5)
-    }
+    // No border on secondary cards - let shadow create separation
 
     private var shadowColor: Color {
         colorScheme == .dark
             ? Color.black.opacity(0.15)
-            : Color.black.opacity(0.06)
+            : Color.black.opacity(0.08)  // Subtle shadow for child depth
     }
 
     private var shadowRadius: CGFloat {
-        colorScheme == .dark ? 4 : 6
+        colorScheme == .dark ? 4 : 10  // Less than parent
     }
 
     private var shadowY: CGFloat {
-        colorScheme == .dark ? 2 : 3
+        colorScheme == .dark ? 2 : 6  // Less lift than parent
     }
 }
 
-// MARK: - Glass Icon Circle (for action card icons)
+// MARK: - Glass Icon Circle
 struct GlassIconCircle: View {
     @Environment(\.colorScheme) var colorScheme
     let icon: String
@@ -203,28 +145,27 @@ struct GlassIconCircle: View {
     var body: some View {
         ZStack {
             if colorScheme == .dark {
-                // Dark mode: material blur + tint
                 Circle()
                     .fill(.thinMaterial)
                 Circle()
                     .fill(Color.white.opacity(0.08))
             } else {
-                // Light mode: frosted glass icon circle
+                // Light mode: subtle glass circle
                 ZStack {
                     TranslucentBlurView(style: .light, intensity: 0.4)
                         .clipShape(Circle())
                     Circle()
-                        .fill(Color.white.opacity(0.22))
+                        .fill(Color.white.opacity(0.10))  // Reduced tint
                 }
             }
 
-            // Icon
+            // Icon - full opacity for visibility
             Image(systemName: icon)
                 .font(.system(size: size * 0.42, weight: .semibold))
-                .foregroundColor(iconColor.opacity(colorScheme == .dark ? 1.0 : 0.95))
+                .foregroundColor(iconColor)
         }
         .frame(width: size, height: size)
-        .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.2 : 0.08), radius: 4, x: 0, y: 2)
+        .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.2 : 0.06), radius: 4, x: 0, y: 2)
     }
 }
 
@@ -239,32 +180,32 @@ extension View {
     }
 }
 
-// MARK: - Glass Text Colors
+// MARK: - Glass Text Colors (increased ink for light mode)
 struct GlassTextColors {
     let colorScheme: ColorScheme
 
     var primary: Color {
         colorScheme == .dark
             ? .white
-            : .black.opacity(0.82)
+            : .black.opacity(0.88)  // Increased from 0.82 - crisp text
     }
 
     var secondary: Color {
         colorScheme == .dark
             ? .white.opacity(0.6)
-            : .black.opacity(0.55)
+            : .black.opacity(0.60)  // Increased from 0.55
     }
 
     var tertiary: Color {
         colorScheme == .dark
             ? .white.opacity(0.4)
-            : .black.opacity(0.35)
+            : .black.opacity(0.45)  // Increased from 0.35 - visible chevrons/icons
     }
 
     var sectionLabel: Color {
         colorScheme == .dark
             ? .white.opacity(0.9)
-            : .black.opacity(0.65)
+            : .black.opacity(0.70)  // Increased from 0.65
     }
 }
 
@@ -281,23 +222,23 @@ struct GlassIconColors {
 
         ScrollView {
             VStack(spacing: 16) {
-                // Primary card
+                // Primary card (parent)
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Primary Glass Card")
-                        .foregroundColor(.black.opacity(0.82))
+                        .foregroundColor(.black.opacity(0.88))
                     Text("Secondary text here")
-                        .foregroundColor(.black.opacity(0.55))
+                        .foregroundColor(.black.opacity(0.60))
                 }
                 .padding()
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .glassCard()
 
-                // Secondary card
+                // Secondary card (child)
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Secondary Glass Card")
-                        .foregroundColor(.black.opacity(0.82))
-                    Text("Nested card style")
-                        .foregroundColor(.black.opacity(0.55))
+                        .foregroundColor(.black.opacity(0.88))
+                    Text("Nested card style - less depth")
+                        .foregroundColor(.black.opacity(0.60))
                 }
                 .padding()
                 .frame(maxWidth: .infinity, alignment: .leading)

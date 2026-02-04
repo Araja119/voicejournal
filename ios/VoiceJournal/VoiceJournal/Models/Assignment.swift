@@ -72,4 +72,5 @@ struct SendAssignmentResponse: Codable {
     let sentVia: String?
     let sentAt: Date?
     let reminderCount: Int?
+    let nextEligibleAt: Date?
 }

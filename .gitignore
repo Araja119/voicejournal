@@ -55,3 +55,9 @@ yarn-error.log
 # Database
 *.db
 *.sqlite
+
+# Backend build output
+dist/
+
+# Local upload storage (dev only)
+uploads/

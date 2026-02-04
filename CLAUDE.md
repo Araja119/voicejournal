@@ -15,8 +15,11 @@ VoiceJournal is an iOS app with a Node.js backend that helps families preserve m
 ### Backend
 - **Runtime**: Node.js with TypeScript
 - **Framework**: Express.js
-- **Database**: SQLite with Prisma ORM
+- **Database**: PostgreSQL with Prisma ORM (SQLite for local dev)
 - **Authentication**: JWT (access + refresh tokens)
+- **File Storage**: Local filesystem (dev) / Cloudflare R2 (production)
+- **Email**: Console mock (dev) / Resend (production)
+- **Deployment**: Railway with Dockerfile
 - **Location**: `/backend/`
 
 ## Project Structure
@@ -39,13 +42,15 @@ voicejournal/
 │   │   ├── Question.swift
 │   │   ├── Person.swift
 │   │   ├── Recording.swift
-│   │   └── Assignment.swift
+│   │   ├── Assignment.swift
+│   │   └── RemindEligibility.swift    # Remind cooldown logic
 │   ├── Services/
 │   │   ├── AuthService.swift
 │   │   ├── JournalService.swift
 │   │   ├── QuestionService.swift
 │   │   ├── PersonService.swift
-│   │   └── RecordingService.swift     # Includes authenticated upload
+│   │   ├── RecordingService.swift     # Includes authenticated upload
+│   │   └── RemindCapTracker.swift     # Daily remind cap tracking
 │   ├── ViewModels/
 │   │   ├── JournalDetailViewModel.swift
 │   │   ├── PeopleViewModel.swift      # Handles "myself" person detection
@@ -67,6 +72,8 @@ voicejournal/
 │       │   ├── RecordingModal.swift   # 4-state recording UI
 │       │   ├── RecordingPlayerView.swift # Full playback with controls
 │       │   └── AudioRecorder.swift    # AVFoundation recording
+│       ├── Questions/
+│       │   └── SendQuestionSheet.swift # 3-step send wizard (person → journal → question)
 │       ├── Components/
 │       │   ├── AppBackground.swift    # Gradient vignette over image
 │       │   ├── AvatarView.swift
@@ -78,28 +85,47 @@ voicejournal/
 │           └── SignupView.swift
 │
 └── backend/
+    ├── Dockerfile                     # Multi-stage Alpine build for Railway
+    ├── .dockerignore
+    ├── railway.toml                   # Railway deployment config
     ├── src/
-    │   ├── app.ts                     # Express app setup
+    │   ├── app.ts                     # Express app setup + web routes
     │   ├── routes/
     │   │   ├── auth.routes.ts
     │   │   ├── journals.routes.ts     # Includes authenticated recording upload
     │   │   ├── questions.routes.ts
     │   │   ├── people.routes.ts
-    │   │   └── recordings.routes.ts   # Exports router + recordPublicRouter
+    │   │   ├── recordings.routes.ts   # Exports router + recordPublicRouter
+    │   │   ├── assignments.routes.ts  # Send, remind, delete assignments
+    │   │   ├── web.routes.ts          # HTML recording page for recipients
+    │   │   ├── templates.routes.ts
+    │   │   ├── users.routes.ts
+    │   │   ├── stats.routes.ts
+    │   │   └── notifications.routes.ts
     │   ├── services/
     │   │   ├── auth.service.ts
     │   │   ├── users.service.ts       # syncSelfPersonsWithUsers() runs at startup
-    │   │   ├── journals.service.ts    # Returns linkedUserId for self-detection
+    │   │   ├── journals.service.ts    # Returns linkedUserId + recording links
     │   │   ├── questions.service.ts
+    │   │   ├── assignments.service.ts # Send/remind with escalating cooldown
     │   │   ├── ai.service.ts          # Claude API for suggested questions
-    │   │   └── recordings.service.ts  # createAuthenticatedRecording()
+    │   │   ├── recordings.service.ts  # createAuthenticatedRecording()
+    │   │   ├── storage.ts             # Provider router (local/R2)
+    │   │   ├── r2-storage.ts          # Cloudflare R2 implementation
+    │   │   ├── email.ts               # Provider router (mock/Resend)
+    │   │   ├── resend-email.ts        # Resend email implementation
+    │   │   ├── templates.service.ts
+    │   │   ├── stats.service.ts
+    │   │   └── notifications.service.ts
+    │   ├── views/
+    │   │   └── record-page.ts         # Server-rendered recording page HTML
     │   ├── validators/
     │   │   └── people.validators.ts   # Includes "self" relationship type
     │   └── middleware/
     │       └── authenticate.ts
     └── prisma/
-        ├── schema.prisma              # Database schema with idempotencyKey
-        └── dev.db                     # SQLite database file
+        ├── schema.prisma              # PostgreSQL database schema
+        └── migrations/                # Prisma migrations
 ```
 
 ## Key Features
@@ -131,7 +157,7 @@ voicejournal/
 - Create questions manually or use AI-suggested questions
 - AI suggestions powered by Claude API (personalized based on journal context)
 - Edit and delete draft questions via action sheet
-- Send questions to recipients (TODO)
+- Send questions to recipients via email with recording link
 
 ### 4. People
 - Add family members/friends as "People"
@@ -168,6 +194,16 @@ voicejournal/
   - Send Question sheet (person selection)
   - Recordings list (person sections and player)
   - People list (MyselfCard and PersonCard)
+
+### 7. Web Recording Page
+- Recipients receive email with link to `/record/{token}`
+- Server-rendered HTML page (no SPA framework needed)
+- Shows greeting, requester name, and question text
+- MediaRecorder API for browser-based audio recording
+- 4-state flow: Record → Review → Upload → Success
+- Mobile-friendly responsive design with dark theme
+- Already-answered detection shows confirmation page
+- 404 page for invalid/expired tokens
 
 ## Self-Recording Feature (Detailed)
 
@@ -319,9 +355,14 @@ Base URL: `http://localhost:3000/v1`
 - **POST `/journals/:journal_id/questions/:question_id/recordings`** - Upload authenticated recording (self-recording)
 
 ### Questions
-- POST `/journals/:id/questions` - Create question
+- POST `/journals/:id/questions` - Create question (with optional `assign_to_person_ids`)
 - PATCH `/journals/:id/questions/:qid` - Update question
 - DELETE `/journals/:id/questions/:qid` - Delete question
+
+### Assignments
+- POST `/assignments/:id/send` - Send assignment via email/SMS
+- POST `/assignments/:id/remind` - Send reminder (escalating cooldown: 1h → 24h → 72h)
+- DELETE `/assignments/:id` - Delete assignment
 
 ### People
 - GET `/people` - List people
@@ -338,6 +379,9 @@ Base URL: `http://localhost:3000/v1`
 ### Public Recording (Unauthenticated - `/record`)
 - GET `/record/:link_token` - Get recording page data for external recipients
 - POST `/record/:link_token/upload` - Upload recording via link token
+
+### Web Recording Page (HTML, not API)
+- GET `/record/:link_token` - Serves full HTML recording page for recipients (browser)
 
 ## SwiftUI Patterns Used
 
@@ -411,14 +455,40 @@ For child views with action menus (like QuestionTimelineCard):
 - [x] True translucent cards with background bleed-through
 - [x] GlassTextColors and GlassIconColors for consistent styling
 - [x] UIKit TranslucentBlurView for precise blur control
+- [x] Transcription display in RecordingPlayerView
+- [x] Play button in timeline (fully functional end-to-end)
+- [x] Microphone permission handling with Settings redirect
+- [x] Re-record option in review screen
 
-### TODO
-- [ ] "Send to [Name]" button flow - send questions to recipients
-- [ ] "Remind" button for awaiting questions
-- [ ] Copy Link functionality
-- [ ] Resend functionality
-- [ ] Transcription display in timeline
-- [ ] Delete recording from timeline
+### TODO - Feature Completion
+- [x] "Send to [Name]" in timeline — wired to QuestionService.sendAssignment
+- [x] "Remind" button — wired with escalating cooldown (1h → 24h → 72h)
+- [x] Copy Link — copies recording link to clipboard with haptic feedback
+- [x] Resend — resends assignment via email
+- [ ] **Delete recording from timeline** — Backend `deleteRecording()` exists, no UI button
+
+### TODO - Deployment (Phase 1 — Code Complete)
+- [x] Backend Dockerfile + railway.toml for Railway deployment
+- [x] PostgreSQL migration (baseline from SQLite)
+- [x] Cloudflare R2 storage provider (`r2-storage.ts`)
+- [x] Resend email provider (`resend-email.ts`)
+- [x] Provider routing (`STORAGE_PROVIDER`, `EMAIL_PROVIDER` env vars)
+- [ ] **Deploy to Railway** — Push to Railway, provision PostgreSQL addon
+- [ ] **Configure R2 bucket** — Create bucket, set env vars
+- [ ] **Configure Resend** — Verify domain, set `RESEND_API_KEY`
+- [ ] **Update iOS APIClient base URL** to production
+- [ ] **TestFlight build** — Upload to App Store Connect
+
+### TODO - Core Loop (Phase 2 — Code Complete)
+- [x] Web recording page for recipients (server-rendered HTML)
+- [x] Email sending via Resend (with mock fallback for dev)
+- [x] End-to-end "Send Question → Receive Recording" flow
+- [x] Recording link in journal detail API response
+
+### TODO - Polish (Phase 3)
+- [ ] Push notifications (Firebase FCM)
+- [ ] Transcription via Whisper API
+- [ ] SMS delivery option (Twilio)
 
 ### Future Ideas / Monetization
 - [ ] **Video Recording (Premium)**: Allow recipients to record video alongside audio when answering questions. Gate behind paywall as a premium feature. Adds visual element to preserved memories.
@@ -441,10 +511,16 @@ npm run dev             # Starts on port 3000
 ### Environment Variables (Backend)
 ```
 PORT=3000
-DATABASE_URL="file:./dev.db"
+NODE_ENV=development
+DATABASE_URL="file:./dev.db"            # SQLite for local dev
+# DATABASE_URL="postgresql://..."       # PostgreSQL for production (set by Railway)
 JWT_SECRET=your-secret
-JWT_REFRESH_SECRET=your-refresh-secret
-ANTHROPIC_API_KEY=your-claude-api-key  # For AI suggestions
+REFRESH_TOKEN_SECRET=your-refresh-secret
+ANTHROPIC_API_KEY=your-claude-api-key
+APP_URL=http://localhost:3000
+WEB_APP_URL=http://localhost:3000
+# STORAGE_PROVIDER=r2                   # Unset = local filesystem mock
+# EMAIL_PROVIDER=resend                 # Unset = console mock
 ```
 
 ## Known Issues & Workarounds
@@ -478,7 +554,7 @@ If existing "myself" person records don't have `relationship = "self"` or `linke
 
 This avoids parameter collision and keeps route concerns separated.
 
-## Database Schema (Key Tables)
+## Database Schema (Key Tables — PostgreSQL)
 
 ```prisma
 model User {
@@ -533,11 +609,17 @@ model Recording {
 }
 
 model QuestionAssignment {
-  id         String    @id @default(uuid())
-  questionId String
-  personId   String
-  status     String    // pending, sent, viewed, answered
-  recordings Recording[]
+  id              String    @id @default(uuid())
+  questionId      String
+  personId        String
+  status          String    // pending, sent, viewed, answered
+  uniqueLinkToken String    @unique @default(uuid())
+  sentAt          DateTime?
+  viewedAt        DateTime?
+  answeredAt      DateTime?
+  reminderCount   Int       @default(0)
+  lastReminderAt  DateTime?
+  recordings      Recording[]
 }
 ```
 
@@ -547,4 +629,4 @@ model QuestionAssignment {
 - Backend: `/Users/ARaja/voicejournal/backend/`
 
 ---
-*Last updated: February 2026 - Light mode frosted glass system with true translucency and background bleed-through using UIKit blur*
+*Last updated: February 2026 — Phase 2 core loop complete (Send/Resend/Remind/Copy Link, web recording page, email delivery)*
