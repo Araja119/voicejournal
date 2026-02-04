@@ -376,15 +376,24 @@ struct SendQuestionSheet: View {
 
         Task {
             do {
-                // Create the question
+                // Create the question (auto-assigns to person)
                 let request = CreateQuestionRequest(
                     questionText: questionText,
                     assignToPersonIds: [person.id]
                 )
-                _ = try await QuestionService.shared.createQuestion(
+                let question = try await QuestionService.shared.createQuestion(
                     journalId: journal.id,
                     request
                 )
+
+                // Send the assignment via email
+                if let assignment = question.assignments?.first {
+                    _ = try await QuestionService.shared.sendAssignment(
+                        assignmentId: assignment.id,
+                        channel: .email
+                    )
+                }
+
                 dismiss()
             } catch {
                 self.error = "Failed to send question"

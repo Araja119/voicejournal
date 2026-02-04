@@ -38,6 +38,15 @@ struct JournalDetailView: View {
     @State private var playbackRecording: Recording?
     @State private var debugMessage: String?
 
+    // Remind state
+    @State private var remindingAssignmentId: String?
+    @State private var remindSuccessAssignmentId: String?
+    @State private var remindError: String?
+
+    // Send question state
+    @State private var sendingQuestionId: String?
+    @State private var sendError: String?
+
     // Journal editing state
     @State private var showingEditJournal = false
     @State private var editedJournalTitle = ""
@@ -218,6 +227,30 @@ struct JournalDetailView: View {
                 Text(msg)
             }
         }
+        .alert("Reminder", isPresented: .init(
+            get: { remindError != nil },
+            set: { if !$0 { remindError = nil } }
+        )) {
+            Button("OK", role: .cancel) {
+                remindError = nil
+            }
+        } message: {
+            if let error = remindError {
+                Text(error)
+            }
+        }
+        .alert("Send Failed", isPresented: .init(
+            get: { sendError != nil },
+            set: { if !$0 { sendError = nil } }
+        )) {
+            Button("OK", role: .cancel) {
+                sendError = nil
+            }
+        } message: {
+            if let error = sendError {
+                Text(error)
+            }
+        }
         .task {
             await viewModel.loadJournal(id: journalId)
         }
@@ -328,6 +361,117 @@ struct JournalDetailView: View {
                     debugMessage = "API Failed: \(error.localizedDescription)"
                 }
             }
+        }
+    }
+
+    // MARK: - Remind Functions
+
+    private func sendReminder(for assignment: Assignment) {
+        // Check per-assignment eligibility
+        let eligibility = RemindEligibility.check(assignment)
+        guard eligibility.canRemind else { return }
+
+        // Check daily/person caps
+        if let capBlock = RemindCapTracker.shared.canRemindPerson(assignment.personId) {
+            switch capBlock {
+            case .dailyCapReached:
+                remindError = "You've reached the daily reminder limit. Try again tomorrow."
+            case .personCapReached:
+                remindError = "You've already reminded this person today."
+            default:
+                break
+            }
+            return
+        }
+
+        remindingAssignmentId = assignment.id
+
+        Task {
+            do {
+                let _ = try await QuestionService.shared.sendReminder(
+                    assignmentId: assignment.id,
+                    channel: .email
+                )
+
+                // Record in cap tracker
+                RemindCapTracker.shared.recordRemind(personId: assignment.personId)
+
+                // Show success flash
+                remindingAssignmentId = nil
+                remindSuccessAssignmentId = assignment.id
+
+                // Clear success flash after 2 seconds
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                    remindSuccessAssignmentId = nil
+                }
+
+                // Refresh journal to get updated reminderCount/lastReminderAt
+                await viewModel.loadJournal(id: journalId)
+            } catch {
+                remindingAssignmentId = nil
+                remindError = "Could not send reminder. Try again later."
+            }
+        }
+    }
+
+    // MARK: - Send Question Functions
+
+    private func sendQuestion(for question: Question) {
+        guard let journal = viewModel.journal,
+              let person = journal.dedicatedToPerson else { return }
+
+        sendingQuestionId = question.id
+
+        Task {
+            do {
+                // Step 1: Assign if no assignment exists for this person
+                var assignmentId: String
+                if let existing = question.assignments?.first(where: { $0.personId == person.id }) {
+                    assignmentId = existing.id
+                } else {
+                    let response = try await QuestionService.shared.assignQuestion(
+                        questionId: question.id, personIds: [person.id]
+                    )
+                    assignmentId = response.assignments.first!.id
+                }
+
+                // Step 2: Send the assignment via email
+                _ = try await QuestionService.shared.sendAssignment(
+                    assignmentId: assignmentId, channel: .email
+                )
+
+                // Step 3: Reload journal to reflect new state
+                await viewModel.loadJournal(id: journalId)
+            } catch {
+                sendError = "Failed to send question. Try again."
+            }
+            sendingQuestionId = nil
+        }
+    }
+
+    private func resendQuestion(for question: Question) {
+        if let assignment = question.assignments?.first(where: {
+            $0.status == .sent || $0.status == .viewed
+        }) {
+            Task {
+                do {
+                    _ = try await QuestionService.shared.sendAssignment(
+                        assignmentId: assignment.id, channel: .email
+                    )
+                    await viewModel.loadJournal(id: journalId)
+                } catch {
+                    sendError = "Failed to resend. Try again."
+                }
+            }
+        }
+    }
+
+    private func copyLink(for question: Question) {
+        if let assignment = question.assignments?.first,
+           let link = assignment.recordingLink {
+            UIPasteboard.general.string = link
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.success)
         }
     }
 
@@ -757,18 +901,27 @@ struct JournalDetailView: View {
                             questionToDelete = question
                             showingQuestionDeleteConfirmation = true
                         },
+                        onSendTapped: {
+                            sendQuestion(for: question)
+                        },
                         onCopyLinkTapped: {
-                            // TODO: Copy link
+                            copyLink(for: question)
                         },
                         onResendTapped: {
-                            // TODO: Resend
+                            resendQuestion(for: question)
                         },
                         onRecordTapped: {
                             startRecording(for: question)
                         },
                         onPlayTapped: { assignment in
                             playRecording(for: assignment)
-                        }
+                        },
+                        onRemindTapped: { assignment in
+                            sendReminder(for: assignment)
+                        },
+                        sendingQuestionId: sendingQuestionId,
+                        remindingAssignmentId: remindingAssignmentId,
+                        remindSuccessAssignmentId: remindSuccessAssignmentId
                     )
                     .padding(.bottom, Theme.Spacing.md)
                 }
@@ -848,20 +1001,39 @@ struct QuestionTimelineCard: View {
     // Callbacks for actions
     var onEditTapped: () -> Void = {}
     var onDeleteTapped: () -> Void = {}
+    var onSendTapped: () -> Void = {}
     var onCopyLinkTapped: () -> Void = {}
     var onResendTapped: () -> Void = {}
     var onRecordTapped: () -> Void = {}
     var onPlayTapped: ((Assignment) -> Void)?
+    var onRemindTapped: ((Assignment) -> Void)?
+
+    // Send/Remind UI state (passed from parent)
+    var sendingQuestionId: String?
+    var remindingAssignmentId: String?
+    var remindSuccessAssignmentId: String?
+
+    /// First assignment eligible for remind (for header-level capsule)
+    private var firstEligibleAssignment: Assignment? {
+        question.assignments?.first { assignment in
+            (assignment.status == .sent || assignment.status == .viewed)
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-            // Header row with question text and menu button
+            // Header row with question text, remind capsule, and menu button
             HStack(alignment: .top) {
                 Text(question.questionText)
                     .font(AppTypography.bodyLarge)
                     .foregroundColor(colorScheme == .dark ? .white : .black.opacity(0.85))
 
                 Spacer()
+
+                // Remind capsule — small, contextual, question-level
+                if state == .awaiting, let firstEligible = firstEligibleAssignment {
+                    remindButton(for: firstEligible)
+                }
 
                 // Menu appears directly under the ellipsis button
                 Menu {
@@ -988,10 +1160,11 @@ struct QuestionTimelineCard: View {
                 }
             } else {
                 // Regular journal: "Send to [Name]" button
-                if isFirstDraft {
-                    Button(action: {
-                        // TODO: Open send flow
-                    }) {
+                if sendingQuestionId == question.id {
+                    ProgressView()
+                        .tint(colors.accentPrimary)
+                } else if isFirstDraft {
+                    Button(action: onSendTapped) {
                         HStack(spacing: Theme.Spacing.xs) {
                             Image(systemName: "paperplane.fill")
                                 .font(.system(size: 12))
@@ -1005,9 +1178,7 @@ struct QuestionTimelineCard: View {
                         .cornerRadius(Theme.Radius.md)
                     }
                 } else {
-                    Button(action: {
-                        // TODO: Open send flow
-                    }) {
+                    Button(action: onSendTapped) {
                         HStack(spacing: Theme.Spacing.xxs) {
                             Image(systemName: "paperplane")
                                 .font(.system(size: 11))
@@ -1041,17 +1212,6 @@ struct QuestionTimelineCard: View {
 
                         // Status chip
                         awaitingStatusChip(for: assignment.status)
-
-                        // Remind button for sent/viewed
-                        if assignment.status == .sent || assignment.status == .viewed {
-                            Button(action: {
-                                // TODO: Send reminder
-                            }) {
-                                Text("Remind")
-                                    .font(AppTypography.caption)
-                                    .foregroundColor(colors.accentPrimary)
-                            }
-                        }
                     }
                 }
             } else {
@@ -1089,6 +1249,64 @@ struct QuestionTimelineCard: View {
             .padding(.vertical, Theme.Spacing.xxs)
             .background(color.opacity(0.15))
             .cornerRadius(Theme.Radius.sm)
+    }
+
+    // MARK: - Remind Button (small capsule utility — question-level)
+    @ViewBuilder
+    private func remindButton(for assignment: Assignment) -> some View {
+        let eligibility = RemindEligibility.check(assignment)
+        let isReminding = remindingAssignmentId == assignment.id
+        let isSuccess = remindSuccessAssignmentId == assignment.id
+
+        if isSuccess {
+            // Success flash
+            Text("Sent!")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(.green)
+                .padding(.horizontal, 8)
+                .frame(height: 24)
+        } else if isReminding {
+            // Loading state
+            ProgressView()
+                .progressViewStyle(CircularProgressViewStyle())
+                .scaleEffect(0.6)
+                .frame(height: 24)
+        } else if eligibility.canRemind {
+            // Eligible — small outlined capsule, not a CTA
+            Text("Remind")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(colorScheme == .dark ? .white.opacity(0.7) : .black.opacity(0.55))
+                .padding(.horizontal, 10)
+                .frame(height: 24)
+                .background(
+                    Capsule()
+                        .stroke(
+                            colorScheme == .dark ? Color.white.opacity(0.15) : Color.black.opacity(0.12),
+                            lineWidth: 1
+                        )
+                )
+                .onTapGesture { onRemindTapped?(assignment) }
+        } else {
+            // Not eligible — muted state
+            switch eligibility.reason {
+            case .cooldownActive:
+                if let remaining = eligibility.cooldownRemaining {
+                    Text(RemindEligibility.formatCooldown(remaining))
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(colorScheme == .dark ? .white.opacity(0.3) : .black.opacity(0.3))
+                        .padding(.horizontal, 8)
+                        .frame(height: 24)
+                }
+            case .maxRemindersReached:
+                Text("3\u{00D7}")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(colorScheme == .dark ? .white.opacity(0.25) : .black.opacity(0.25))
+                    .padding(.horizontal, 6)
+                    .frame(height: 24)
+            default:
+                EmptyView()
+            }
+        }
     }
 
     // MARK: - Answered State Content
@@ -1355,4 +1573,218 @@ struct EditJournalSheet: View {
         JournalDetailView(journalId: "test-id")
     }
     .preferredColorScheme(.dark)
+}
+
+// MARK: - Remind Button States Preview
+#Preview("Remind States - Light") {
+    RemindStatesPreview()
+        .preferredColorScheme(.light)
+}
+
+#Preview("Remind States - Dark") {
+    RemindStatesPreview()
+        .preferredColorScheme(.dark)
+}
+
+/// Self-contained preview showing all Remind button states
+private struct RemindStatesPreview: View {
+    @Environment(\.colorScheme) var colorScheme
+
+    // Mock assignments in different remind states
+    private var eligibleAssignment: Assignment {
+        Assignment(
+            id: "a1", personId: "p1", personName: "Grandma Rose",
+            personProfilePhotoUrl: nil, status: .sent,
+            uniqueLinkToken: nil, recordingLink: nil, recording: nil,
+            sentAt: Date().addingTimeInterval(-2 * 86400), // 2 days ago
+            viewedAt: nil, answeredAt: nil,
+            reminderCount: 0, lastReminderAt: nil
+        )
+    }
+
+    private var cooldownAssignment: Assignment {
+        Assignment(
+            id: "a2", personId: "p2", personName: "Uncle Mike",
+            personProfilePhotoUrl: nil, status: .viewed,
+            uniqueLinkToken: nil, recordingLink: nil, recording: nil,
+            sentAt: Date().addingTimeInterval(-3 * 86400),
+            viewedAt: Date().addingTimeInterval(-86400),
+            answeredAt: nil,
+            reminderCount: 1, lastReminderAt: Date().addingTimeInterval(-3600) // 1 hour ago (needs 72h)
+        )
+    }
+
+    private var maxRemindedAssignment: Assignment {
+        Assignment(
+            id: "a3", personId: "p3", personName: "Dad",
+            personProfilePhotoUrl: nil, status: .sent,
+            uniqueLinkToken: nil, recordingLink: nil, recording: nil,
+            sentAt: Date().addingTimeInterval(-30 * 86400),
+            viewedAt: nil, answeredAt: nil,
+            reminderCount: 3, lastReminderAt: Date().addingTimeInterval(-10 * 86400)
+        )
+    }
+
+    private var answeredAssignment: Assignment {
+        Assignment(
+            id: "a4", personId: "p4", personName: "Mom",
+            personProfilePhotoUrl: nil, status: .answered,
+            uniqueLinkToken: nil, recordingLink: nil, recording: AssignmentRecording(id: "r1", durationSeconds: 45, recordedAt: Date()),
+            sentAt: Date().addingTimeInterval(-5 * 86400),
+            viewedAt: Date().addingTimeInterval(-3 * 86400),
+            answeredAt: Date().addingTimeInterval(-86400),
+            reminderCount: 1, lastReminderAt: Date().addingTimeInterval(-4 * 86400)
+        )
+    }
+
+    private var pendingAssignment: Assignment {
+        Assignment(
+            id: "a5", personId: "p5", personName: "Sister",
+            personProfilePhotoUrl: nil, status: .pending,
+            uniqueLinkToken: nil, recordingLink: nil, recording: nil,
+            sentAt: nil, viewedAt: nil, answeredAt: nil,
+            reminderCount: 0, lastReminderAt: nil
+        )
+    }
+
+    var body: some View {
+        let colors = AppColors(colorScheme)
+
+        ZStack {
+            AppBackground()
+                .ignoresSafeArea()
+
+            ScrollView {
+                VStack(spacing: Theme.Spacing.lg) {
+                    // Title
+                    Text("Remind Button States")
+                        .font(AppTypography.headlineLarge)
+                        .foregroundColor(colorScheme == .dark ? .white : .black.opacity(0.85))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    // 1. Eligible - can remind
+                    sectionLabel("1. Eligible (sent 2 days ago, 0 reminders)")
+                    mockTimelineCard(
+                        question: "What's your earliest childhood memory?",
+                        assignment: eligibleAssignment,
+                        state: .awaiting,
+                        colors: colors
+                    )
+
+                    // 2. Cooldown active
+                    sectionLabel("2. Cooldown Active (reminded 1h ago, needs 72h)")
+                    mockTimelineCard(
+                        question: "Tell me about your first job.",
+                        assignment: cooldownAssignment,
+                        state: .awaiting,
+                        colors: colors
+                    )
+
+                    // 3. Max reminders reached
+                    sectionLabel("3. Max Reached (3 reminders sent)")
+                    mockTimelineCard(
+                        question: "What advice would you give your younger self?",
+                        assignment: maxRemindedAssignment,
+                        state: .awaiting,
+                        colors: colors
+                    )
+
+                    // 4. Answered (no remind button)
+                    sectionLabel("4. Answered (remind not shown)")
+                    mockTimelineCard(
+                        question: "What makes you happiest today?",
+                        assignment: answeredAssignment,
+                        state: .answered,
+                        colors: colors
+                    )
+
+                    // 5. Draft/Pending (no remind button)
+                    sectionLabel("5. Draft/Not Sent (remind not shown)")
+                    mockTimelineCard(
+                        question: "What family tradition do you cherish most?",
+                        assignment: pendingAssignment,
+                        state: .draft,
+                        colors: colors
+                    )
+
+                    // Hub card with remind
+                    sectionLabel("6. Hub 'In Progress' Card with Remind")
+                    mockHubCard(colors: colors)
+                }
+                .padding(Theme.Spacing.lg)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func sectionLabel(_ text: String) -> some View {
+        Text(text)
+            .font(AppTypography.caption)
+            .foregroundColor(colorScheme == .dark ? .white.opacity(0.5) : .black.opacity(0.45))
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private func mockTimelineCard(question: String, assignment: Assignment, state: QuestionState, colors: AppColors) -> some View {
+        QuestionTimelineCard(
+            question: Question(
+                id: "q-\(assignment.id)",
+                questionText: question,
+                source: .custom,
+                displayOrder: 0,
+                assignments: [assignment]
+            ),
+            recipientName: assignment.personName,
+            state: state,
+            isFirstDraft: false,
+            isSelfJournal: false,
+            colors: colors,
+            onRemindTapped: { _ in },
+            remindingAssignmentId: nil,
+            remindSuccessAssignmentId: nil
+        )
+    }
+
+    @ViewBuilder
+    private func mockHubCard(colors: AppColors) -> some View {
+        VStack(spacing: Theme.Spacing.sm) {
+            let item = InProgressItem(
+                id: "hub-1",
+                personId: "p1",
+                personName: "Grandma Rose",
+                personPhotoUrl: nil,
+                journalId: "j1",
+                journalTitle: "Stories from the Old Country",
+                primaryText: "Waiting on Grandma Rose",
+                secondaryText: "Last reply 3 days ago",
+                tertiaryText: nil,
+                unansweredCount: 3,
+                oldestUnansweredDate: Date().addingTimeInterval(-7 * 86400),
+                lastActivityDate: Date().addingTimeInterval(-3 * 86400),
+                responseRate: 0.4
+            )
+
+            // Idle state
+            sectionLabel("Idle — primary action")
+            InProgressCardStyled(
+                item: item,
+                cardType: .waiting,
+                colors: colors,
+                onTap: {},
+                onRemindTapped: {},
+                remindState: .idle
+            )
+
+            // Success state
+            sectionLabel("After tap — 'Sent!' flash")
+            InProgressCardStyled(
+                item: item,
+                cardType: .waiting,
+                colors: colors,
+                onTap: {},
+                onRemindTapped: {},
+                remindState: .success
+            )
+        }
+    }
 }

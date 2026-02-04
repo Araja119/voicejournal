@@ -53,6 +53,13 @@ export interface JournalDetail extends JournalSummary {
       person_name: string;
       person_profile_photo_url: string | null;
       status: string;
+      unique_link_token: string;
+      recording_link: string;
+      sent_at: Date | null;
+      viewed_at: Date | null;
+      answered_at: Date | null;
+      reminder_count: number;
+      last_reminder_at: Date | null;
       recording: {
         id: string;
         duration_seconds: number | null;
@@ -287,6 +294,13 @@ export async function getJournal(userId: string, journalId: string): Promise<Jou
         person_name: a.person.name,
         person_profile_photo_url: a.person.profilePhotoUrl,
         status: a.status,
+        unique_link_token: a.uniqueLinkToken,
+        recording_link: `${appUrl}/record/${a.uniqueLinkToken}`,
+        sent_at: a.sentAt,
+        viewed_at: a.viewedAt,
+        answered_at: a.answeredAt,
+        reminder_count: a.reminderCount,
+        last_reminder_at: a.lastReminderAt,
         recording: a.recordings[0]
           ? {
               id: a.recordings[0].id,
