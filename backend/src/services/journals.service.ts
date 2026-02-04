@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import prisma from '../utils/prisma.js';
 import { NotFoundError, ForbiddenError } from '../utils/errors.js';
-import { uploadJournalCover } from '../mocks/storage.js';
+import { uploadJournalCover } from './storage.js';
 import type {
   CreateJournalInput,
   UpdateJournalInput,

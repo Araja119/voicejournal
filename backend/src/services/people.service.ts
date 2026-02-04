@@ -1,6 +1,6 @@
 import prisma from '../utils/prisma.js';
 import { NotFoundError, ForbiddenError } from '../utils/errors.js';
-import { uploadPersonPhoto } from '../mocks/storage.js';
+import { uploadPersonPhoto } from './storage.js';
 import type { CreatePersonInput, UpdatePersonInput } from '../validators/people.validators.js';
 
 export interface PersonSummary {

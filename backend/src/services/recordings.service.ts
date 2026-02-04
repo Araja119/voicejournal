@@ -1,9 +1,9 @@
 import { randomUUID } from 'crypto';
 import prisma from '../utils/prisma.js';
 import { NotFoundError, ForbiddenError, ValidationError } from '../utils/errors.js';
-import { uploadAudio, getSignedUrl } from '../mocks/storage.js';
+import { uploadAudio, getSignedUrl } from './storage.js';
 import { notifyRecordingReceived } from '../mocks/push.js';
-import { sendRecordingReceivedEmail } from '../mocks/email.js';
+import { sendRecordingReceivedEmail } from './email.js';
 import { getUserPushTokens } from './users.service.js';
 import type { RecordingsQueryInput } from '../validators/recordings.validators.js';
 
@@ -226,7 +226,7 @@ export async function listRecordings(
   ]);
 
   return {
-    recordings: recordings.map((r) => ({
+    recordings: await Promise.all(recordings.map(async (r) => ({
       id: r.id,
       question: {
         id: r.assignment.question.id,
@@ -241,11 +241,11 @@ export async function listRecordings(
         id: r.assignment.question.journal.id,
         title: r.assignment.question.journal.title,
       },
-      audio_url: getSignedUrl(r.audioFileUrl),
+      audio_url: await getSignedUrl(r.audioFileUrl),
       duration_seconds: r.durationSeconds,
       transcription: r.transcription,
       recorded_at: r.recordedAt,
-    })),
+    }))),
     total,
     limit,
     offset,
@@ -290,7 +290,7 @@ export async function getRecording(userId: string, recordingId: string): Promise
       id: recording.assignment.question.journal.id,
       title: recording.assignment.question.journal.title,
     },
-    audio_url: getSignedUrl(recording.audioFileUrl),
+    audio_url: await getSignedUrl(recording.audioFileUrl),
     duration_seconds: recording.durationSeconds,
     transcription: recording.transcription,
     recorded_at: recording.recordedAt,
@@ -443,7 +443,7 @@ export async function createAuthenticatedRecording(
           id: existingRecording.assignment.question.journal.id,
           title: existingRecording.assignment.question.journal.title,
         },
-        audio_url: getSignedUrl(existingRecording.audioFileUrl),
+        audio_url: await getSignedUrl(existingRecording.audioFileUrl),
         duration_seconds: existingRecording.durationSeconds,
         transcription: existingRecording.transcription,
         recorded_at: existingRecording.recordedAt,
@@ -569,7 +569,7 @@ export async function createAuthenticatedRecording(
       id: recording.assignment.question.journal.id,
       title: recording.assignment.question.journal.title,
     },
-    audio_url: getSignedUrl(recording.audioFileUrl),
+    audio_url: await getSignedUrl(recording.audioFileUrl),
     duration_seconds: recording.durationSeconds,
     transcription: recording.transcription,
     recorded_at: recording.recordedAt,

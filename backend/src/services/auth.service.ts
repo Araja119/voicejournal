@@ -8,7 +8,7 @@ import {
   getRefreshTokenExpiry,
 } from '../utils/jwt.js';
 import { ConflictError, UnauthorizedError, NotFoundError } from '../utils/errors.js';
-import { sendPasswordResetEmail } from '../mocks/email.js';
+import { sendPasswordResetEmail } from './email.js';
 import type { SignupInput, LoginInput } from '../validators/auth.validators.js';
 
 const SALT_ROUNDS = 12;

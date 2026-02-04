@@ -1,6 +1,6 @@
 import prisma from '../utils/prisma.js';
 import { NotFoundError } from '../utils/errors.js';
-import { uploadProfilePhoto } from '../mocks/storage.js';
+import { uploadProfilePhoto } from './storage.js';
 import type { UpdateUserInput, PushTokenInput } from '../validators/users.validators.js';
 
 /**
