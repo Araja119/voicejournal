@@ -11,11 +11,13 @@ datasource db {
 model User {
   id              String   @id @default(uuid())
   email           String   @unique
-  passwordHash    String   @map("password_hash")
+  passwordHash    String?  @map("password_hash")
   phoneNumber     String?  @map("phone_number")
   displayName     String   @map("display_name")
   profilePhotoUrl String?  @map("profile_photo_url")
   subscriptionTier String  @default("free") @map("subscription_tier")
+  appleUserId     String?  @unique @map("apple_user_id")
+  authProvider    String   @default("email") @map("auth_provider")
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 

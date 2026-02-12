@@ -16,7 +16,7 @@ VoiceJournal is an iOS app with a Node.js backend that helps families preserve m
 - **Runtime**: Node.js with TypeScript
 - **Framework**: Express.js
 - **Database**: PostgreSQL with Prisma ORM (SQLite for local dev)
-- **Authentication**: JWT (access + refresh tokens)
+- **Authentication**: JWT (access + refresh tokens) + Apple Sign-In
 - **File Storage**: Local filesystem (dev) / Cloudflare R2 (production)
 - **Email**: Console mock (dev) / Resend (production)
 - **Deployment**: Railway with Dockerfile
@@ -45,7 +45,8 @@ voicejournal/
 │   │   ├── Assignment.swift
 │   │   └── RemindEligibility.swift    # Remind cooldown logic
 │   ├── Services/
-│   │   ├── AuthService.swift
+│   │   ├── AuthService.swift          # Includes appleSignIn() method
+│   │   ├── AppleSignInManager.swift   # ASAuthorizationController async/await wrapper
 │   │   ├── JournalService.swift
 │   │   ├── QuestionService.swift
 │   │   ├── PersonService.swift
@@ -80,9 +81,11 @@ voicejournal/
 │       │   ├── EmptyStateView.swift
 │       │   ├── GlassView.swift        # Frosted glass card modifiers
 │       │   └── LoadingView.swift
-│       └── Auth/
-│           ├── LoginView.swift
-│           └── SignupView.swift
+│       ├── Auth/
+│       │   ├── LoginView.swift
+│       │   └── SignupView.swift
+│       └── Components/
+│           └── AppleSignInButtonView.swift  # Custom Apple Sign-In button (Apple HIG)
 │
 └── backend/
     ├── Dockerfile                     # Multi-stage Alpine build for Railway
@@ -120,7 +123,8 @@ voicejournal/
     │   ├── views/
     │   │   └── record-page.ts         # Server-rendered recording page HTML
     │   ├── validators/
-    │   │   └── people.validators.ts   # Includes "self" relationship type
+    │   │   ├── people.validators.ts   # Includes "self" relationship type
+    │   │   └── auth.validators.ts     # Login, signup, and Apple sign-in schemas
     │   └── middleware/
     │       └── authenticate.ts
     └── prisma/
@@ -337,13 +341,15 @@ GlassIconCircle(icon: "paperplane.fill", iconColor: GlassIconColors.sendQuestion
 
 ## API Endpoints
 
-Base URL: `http://localhost:3000/v1`
+Base URL (local): `http://localhost:3000/v1`
+Base URL (production): `https://invigorating-amazement-production-81b6.up.railway.app/v1`
 
 ### Auth
 - POST `/auth/signup` - Create account
 - POST `/auth/login` - Login, returns tokens
 - POST `/auth/refresh` - Refresh access token
 - POST `/auth/logout` - Invalidate tokens
+- POST `/auth/apple` - Apple Sign-In (verifies identity token, creates/links account)
 
 ### Journals
 - GET `/journals` - List user's journals
@@ -459,6 +465,10 @@ For child views with action menus (like QuestionTimelineCard):
 - [x] Play button in timeline (fully functional end-to-end)
 - [x] Microphone permission handling with Settings redirect
 - [x] Re-record option in review screen
+- [x] Apple Sign-In — full backend + iOS implementation (code complete, not yet deployed)
+- [x] App icon generated (1024x1024, orange-to-coral gradient)
+- [x] TestFlight build uploaded (1.0 build 3) to App Store Connect
+- [x] Export compliance resolved for TestFlight
 
 ### TODO - Feature Completion
 - [x] "Send to [Name]" in timeline — wired to QuestionService.sendAssignment
@@ -467,17 +477,125 @@ For child views with action menus (like QuestionTimelineCard):
 - [x] Resend — resends assignment via email
 - [ ] **Delete recording from timeline** — Backend `deleteRecording()` exists, no UI button
 
-### TODO - Deployment (Phase 1 — Code Complete)
+### TODO - Deployment (Phase 1 — Complete)
 - [x] Backend Dockerfile + railway.toml for Railway deployment
 - [x] PostgreSQL migration (baseline from SQLite)
 - [x] Cloudflare R2 storage provider (`r2-storage.ts`)
 - [x] Resend email provider (`resend-email.ts`)
 - [x] Provider routing (`STORAGE_PROVIDER`, `EMAIL_PROVIDER` env vars)
-- [ ] **Deploy to Railway** — Push to Railway, provision PostgreSQL addon
-- [ ] **Configure R2 bucket** — Create bucket, set env vars
-- [ ] **Configure Resend** — Verify domain, set `RESEND_API_KEY`
-- [ ] **Update iOS APIClient base URL** to production
-- [ ] **TestFlight build** — Upload to App Store Connect
+- [x] **Deploy to Railway** — Backend deployed with PostgreSQL addon
+- [x] **Configure R2 bucket** — Bucket `voicejournal` created, env vars set
+- [x] **Configure Resend** — API key configured, EMAIL_PROVIDER=resend
+- [x] **Update iOS APIClient base URL** to production (line 8 of APIEndpoints.swift)
+- [x] **Apple Developer Account** — Approved and activated
+- [x] **TestFlight build** — Version 1.0 (3) uploaded to App Store Connect
+- [x] **App icon** — Generated 1024x1024 AppIcon.png (orange-to-coral gradient, microphone + "VJ")
+- [x] **Export compliance** — Set to "None of the algorithms mentioned above" (standard HTTPS only)
+- [ ] **Add ANTHROPIC_API_KEY** — For AI-suggested questions (optional, do later)
+- [ ] **Deploy Apple Sign-In backend changes** — Migration + new route (see Apple Sign-In section below)
+
+#### Railway Deployment Details
+- **Project**: `invigorating-amazement`
+- **Public URL**: `https://invigorating-amazement-production-81b6.up.railway.app`
+- **Health check**: `https://invigorating-amazement-production-81b6.up.railway.app/health`
+- **Region**: EU West (Amsterdam, Netherlands)
+- **Database**: PostgreSQL (Railway addon, auto-configured DATABASE_URL)
+
+**Configured env vars (all set):**
+- `DATABASE_URL` — Auto-set by Railway PostgreSQL addon
+- `NODE_ENV` — production
+- `PORT` — Auto-set by Railway
+- `JWT_SECRET` — Set
+- `REFRESH_TOKEN_SECRET` — Set
+- `JWT_EXPIRES_IN` — Set
+- `REFRESH_TOKEN_EXPIRES_IN` — Set
+- `EMAIL_FROM` — Set
+- `APP_URL` — https://invigorating-amazement-production-81b6.up.railway.app
+- `WEB_APP_URL` — https://invigorating-amazement-production-81b6.up.railway.app
+- `STORAGE_PROVIDER` — r2
+- `R2_ACCOUNT_ID` — Set
+- `R2_ACCESS_KEY_ID` — Set
+- `R2_SECRET_ACCESS_KEY` — Set
+- `R2_BUCKET_NAME` — voicejournal
+- `EMAIL_PROVIDER` — resend
+- `RESEND_API_KEY` — Set
+
+**Not yet configured:**
+- `APPLE_CLIENT_ID` — Needed for Apple Sign-In token verification (should be `ARaja.VoiceJournal`)
+- `ANTHROPIC_API_KEY` — Needed for AI question suggestions (optional)
+
+#### Cloudflare R2 Details
+- **Bucket name**: `voicejournal`
+- **Account**: Araja1685@gmail.com
+- **API Token**: `voicejournal-backend` (Object Read & Write permissions)
+
+#### Resend Email Limitations (Free Tier)
+- Currently using Resend's test domain (`onboarding@resend.dev`)
+- Can only send to **your own verified email addresses** on free tier
+- To send to any email address: verify a custom domain in Resend dashboard
+- When you have a domain, update `EMAIL_FROM` env var to `noreply@yourdomain.com`
+
+#### App Store Connect Details
+- **App Name**: VoiceJournal: Stories
+- **Bundle ID**: ARaja.VoiceJournal
+- **SKU**: VoiceJournal2026
+- **Team**: Abdullah Raja (Apple Developer Program)
+- **iPhone UDID**: 00008150-0018059A34C0401C (registered for development)
+- **TestFlight builds uploaded**: 1.0 (1), 1.0 (2), 1.0 (3) — build 3 is latest
+- **Note**: TestFlight build 1.0 (3) does NOT include Apple Sign-In (was uploaded before implementation)
+
+#### TestFlight Process (Completed)
+1. Signed with "Abdullah Raja" Developer Team (not Personal Team)
+2. Registered iPhone UDID at developer.apple.com
+3. Product → Archive → Distribute App → App Store Connect → Upload
+4. App Store Connect → TestFlight → Manage Compliance → "None of the algorithms"
+5. Add testers via TestFlight tab
+
+### Apple Sign-In (Code Complete — Awaiting Deployment)
+Full Apple Sign-In implementation is code-complete on both backend and iOS. Builds successfully but has NOT been deployed to Railway or tested on a physical device yet.
+
+#### Backend Changes (Local, Not Deployed)
+- **`prisma/schema.prisma`**: `passwordHash` now nullable (`String?`), added `appleUserId String? @unique`, added `authProvider String @default("email")`
+- **`prisma/migrations/20260211000000_add_apple_signin_fields/migration.sql`**: Manual migration SQL (no local PostgreSQL)
+- **`src/validators/auth.validators.ts`**: Added `appleSignInSchema` Zod schema
+- **`src/services/auth.service.ts`**: Added `appleSignIn()` function with 3-step logic (lookup by appleUserId → lookup by email for account linking → create new user), uses `apple-signin-auth` package to verify Apple identity tokens
+- **`src/routes/auth.routes.ts`**: Added `POST /auth/apple` route
+- **Dependency**: `apple-signin-auth` npm package installed
+
+#### iOS Changes (Built Successfully)
+- **`Services/AppleSignInManager.swift`** (NEW): `@MainActor class` wrapping `ASAuthorizationController` with async/await via `CheckedContinuation`. Generates random nonce with SHA-256 hash for replay protection. Returns `AppleSignInResult` with identityToken, authorizationCode, userId, email, fullName.
+- **`Views/Components/AppleSignInButtonView.swift`** (NEW): Custom styled button — white on dark, black on light (Apple HIG). Shows Apple logo + "Sign in with Apple" text, or ProgressView when loading.
+- **`Core/Network/APIEndpoints.swift`**: Added `.appleSignIn` case → `/auth/apple`, POST, no auth required
+- **`Services/AuthService.swift`**: Added `appleSignIn()` method sending identityToken, authorizationCode, appleUserId, email, fullName to backend
+- **`ViewModels/AppState.swift`**: Added `signInWithApple()` method, stores `appleUserId` in UserDefaults, credential revocation check in `checkAuthState()` via `ASAuthorizationAppleIDProvider().credentialState()`
+- **`ViewModels/AuthViewModel.swift`**: Added `isAppleSigningIn`, `appleSignInError` state, `signInWithApple(appState:)` method. Handles `ASAuthorizationError.canceled` silently.
+- **`Views/Auth/LoginView.swift`**: Added "or" divider + AppleSignInButtonView after "Log In" button
+- **`Views/Auth/SignupView.swift`**: Added "or" divider + AppleSignInButtonView after "Create Account" button
+- **`Views/Onboarding/OnboardingView.swift`**: Added AppleSignInButtonView between "Create Account" and "Already have an account?"
+- **`VoiceJournalApp.swift`**: Listens for `ASAuthorizationAppleIDProvider.credentialRevokedNotification` → auto logout
+
+#### Key Design Decisions
+- **Account linking**: If Apple email matches an existing email/password account, links them (`authProvider` → "both")
+- **Apple-only users**: `passwordHash` is null; attempting email/password login returns a specific error
+- **First vs subsequent sign-ins**: Apple only provides email/name on first authorization; backend uses `appleUserId` for lookup after that
+- **Private relay email**: Stored as-is; works for sending emails
+- **Credential revocation**: Detected via notification + credential state check → auto logout
+- **AppleSignInManager is NOT an ObservableObject** — it's used as a one-shot async call from AuthViewModel (removed ObservableObject conformance to fix NSObject + @MainActor build error)
+
+#### Deployment Steps Remaining
+1. Push backend changes to git / deploy to Railway
+2. Add `APPLE_CLIENT_ID=ARaja.VoiceJournal` env var to Railway
+3. Add "Sign in with Apple" capability in Xcode Signing & Capabilities tab
+4. Enable Sign in with Apple in Apple Developer portal for bundle ID `ARaja.VoiceJournal`
+5. Run on physical iPhone to test (Apple Sign-In does NOT work on Simulator)
+6. Re-archive and upload new TestFlight build with Apple Sign-In
+
+#### Future: Google Sign-In
+- Requires Google Cloud Console OAuth credentials
+- Add `GOOGLE_CLIENT_ID` env var
+- Backend verifies Google tokens
+- Can coexist with email/password and Apple auth
+- Deferred until after Apple Sign-In is tested
 
 ### TODO - Core Loop (Phase 2 — Code Complete)
 - [x] Web recording page for recipients (server-rendered HTML)
@@ -505,8 +623,16 @@ npm run dev             # Starts on port 3000
 
 ### iOS
 1. Open `/ios/VoiceJournal/VoiceJournal.xcodeproj` in Xcode
-2. Select iPhone simulator
+2. Select iPhone simulator or physical device from the device selector (top center toolbar)
 3. Build and run (Cmd+R)
+
+#### Running on Physical iPhone
+1. Connect iPhone via USB cable
+2. In Xcode's main project window (not Organizer), click the device selector in the top center toolbar
+3. Your iPhone should appear under "iOS Devices" — select it
+4. Press Cmd+R to build and run
+5. First time: iPhone will prompt to trust the developer certificate — go to Settings → General → VPN & Device Management → Trust
+6. **Note**: Apple Sign-In only works on physical devices, not Simulator
 
 ### Environment Variables (Backend)
 ```
@@ -545,6 +671,11 @@ If existing "myself" person records don't have `relationship = "self"` or `linke
 1. Update person record manually in database
 2. Delete and recreate the "myself" person through the app
 
+### Apple Sign-In on Simulator
+**Problem**: Tapping "Sign in with Apple" on the iOS Simulator shows "Apple Sign In failed".
+
+**Expected behavior**: Apple Sign-In requires a real device with a signed-in Apple ID. It will never work on the Simulator. Always test on a physical iPhone.
+
 ### Express Route Ordering for Recordings
 **Problem**: Public route `/:link_token` and authenticated `/:recording_id` both use dynamic params. Express matches routes in order, so the public route captured authenticated requests.
 
@@ -560,8 +691,10 @@ This avoids parameter collision and keeps route concerns separated.
 model User {
   id            String    @id @default(uuid())
   email         String    @unique
-  passwordHash  String
+  passwordHash  String?   // Nullable for Apple-only users
   displayName   String?
+  appleUserId   String?   @unique  // Apple's stable user identifier
+  authProvider  String    @default("email")  // "email", "apple", or "both"
   journals      Journal[]
   people        Person[]
 }
@@ -629,4 +762,4 @@ model QuestionAssignment {
 - Backend: `/Users/ARaja/voicejournal/backend/`
 
 ---
-*Last updated: February 2026 — Phase 2 core loop complete (Send/Resend/Remind/Copy Link, web recording page, email delivery)*
+*Last updated: February 11, 2026 — Apple Developer account activated. TestFlight build 1.0 (3) uploaded to App Store Connect (app name: "VoiceJournal: Stories"). Apple Sign-In fully implemented on backend + iOS (code complete, builds successfully). Pending: deploy backend Apple Sign-In changes to Railway, add APPLE_CLIENT_ID env var, add Sign in with Apple Xcode capability, test on physical iPhone, upload new TestFlight build with Apple Sign-In.*

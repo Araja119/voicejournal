@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AuthenticationServices
 
 @main
 struct VoiceJournalApp: App {
@@ -16,6 +17,9 @@ struct VoiceJournalApp: App {
             RootView()
                 .environmentObject(appState)
                 .preferredColorScheme(appState.colorScheme)
+                .onReceive(NotificationCenter.default.publisher(for: ASAuthorizationAppleIDProvider.credentialRevokedNotification)) { _ in
+                    Task { await appState.logout() }
+                }
         }
     }
 }

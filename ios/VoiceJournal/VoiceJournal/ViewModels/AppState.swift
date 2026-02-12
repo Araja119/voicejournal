@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+import AuthenticationServices
 
 // MARK: - App State
 @MainActor
@@ -46,6 +47,19 @@ class AppState: ObservableObject {
             // Check if we have stored tokens
             if await authManager.hasValidTokens {
                 do {
+                    // Check Apple credential revocation if applicable
+                    if let appleUserId = UserDefaults.standard.string(forKey: "appleUserId") {
+                        let provider = ASAuthorizationAppleIDProvider()
+                        let state = try await provider.credentialState(forUserID: appleUserId)
+                        if state == .revoked {
+                            await authManager.clearTokens()
+                            UserDefaults.standard.removeObject(forKey: "appleUserId")
+                            self.isAuthenticated = false
+                            isLoading = false
+                            return
+                        }
+                    }
+
                     // Try to fetch current user to validate session
                     let user = try await AuthService.shared.getCurrentUser()
                     self.currentUser = user
@@ -84,6 +98,23 @@ class AppState: ObservableObject {
         self.isAuthenticated = true
     }
 
+    func signInWithApple(identityToken: String, authorizationCode: String,
+                         appleUserId: String, email: String?,
+                         fullName: String?) async throws {
+        let response = try await AuthService.shared.appleSignIn(
+            identityToken: identityToken,
+            authorizationCode: authorizationCode,
+            appleUserId: appleUserId,
+            email: email,
+            fullName: fullName
+        )
+        await authManager.storeTokens(access: response.accessToken, refresh: response.refreshToken)
+        self.currentUser = response.user
+        self.isAuthenticated = true
+        // Store Apple user ID for credential revocation checks
+        UserDefaults.standard.set(appleUserId, forKey: "appleUserId")
+    }
+
     func logout() async {
         do {
             try await AuthService.shared.logout()
@@ -92,6 +123,7 @@ class AppState: ObservableObject {
             print("Logout error: \(error)")
         }
         await authManager.clearTokens()
+        UserDefaults.standard.removeObject(forKey: "appleUserId")
         self.currentUser = nil
         self.isAuthenticated = false
     }

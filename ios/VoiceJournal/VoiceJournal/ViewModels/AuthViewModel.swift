@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+import AuthenticationServices
 
 // MARK: - Auth View Model
 @MainActor
@@ -17,6 +18,10 @@ class AuthViewModel: ObservableObject {
     @Published var signupDisplayName = ""
     @Published var signupError: String?
     @Published var isSigningUp = false
+
+    // MARK: - Apple Sign In State
+    @Published var isAppleSigningIn = false
+    @Published var appleSignInError: String?
 
     // MARK: - Forgot Password State
     @Published var forgotEmail = ""
@@ -117,6 +122,43 @@ class AuthViewModel: ObservableObject {
         }
 
         isSendingReset = false
+    }
+
+    // MARK: - Apple Sign In
+    func signInWithApple(appState: AppState) async {
+        isAppleSigningIn = true
+        appleSignInError = nil
+
+        do {
+            let manager = AppleSignInManager()
+            let result = try await manager.signIn()
+
+            // Build full name from components
+            var fullName: String? = nil
+            if let nameComponents = result.fullName {
+                let formatter = PersonNameComponentsFormatter()
+                let name = formatter.string(from: nameComponents)
+                if !name.isEmpty {
+                    fullName = name
+                }
+            }
+
+            try await appState.signInWithApple(
+                identityToken: result.identityToken,
+                authorizationCode: result.authorizationCode,
+                appleUserId: result.userId,
+                email: result.email,
+                fullName: fullName
+            )
+        } catch let error as ASAuthorizationError where error.code == .canceled {
+            // User cancelled — do nothing
+        } catch let error as NetworkError {
+            appleSignInError = error.localizedDescription
+        } catch {
+            appleSignInError = "Apple Sign In failed. Please try again."
+        }
+
+        isAppleSigningIn = false
     }
 
     // MARK: - Clear Forms

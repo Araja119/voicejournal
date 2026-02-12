@@ -9,9 +9,11 @@ import {
 } from '../utils/jwt.js';
 import { ConflictError, UnauthorizedError, NotFoundError } from '../utils/errors.js';
 import { sendPasswordResetEmail } from './email.js';
-import type { SignupInput, LoginInput } from '../validators/auth.validators.js';
+import appleSignin from 'apple-signin-auth';
+import type { SignupInput, LoginInput, AppleSignInInput } from '../validators/auth.validators.js';
 
 const SALT_ROUNDS = 12;
+const APPLE_CLIENT_ID = process.env.APPLE_CLIENT_ID || 'ARaja.VoiceJournal';
 
 export interface AuthTokens {
   access_token: string;
@@ -80,6 +82,11 @@ export async function login(input: LoginInput): Promise<UserWithTokens> {
 
   if (!user) {
     throw new UnauthorizedError('Invalid email or password');
+  }
+
+  // Check if user has a password (Apple-only users don't)
+  if (!user.passwordHash) {
+    throw new UnauthorizedError('This account uses Apple Sign In. Please sign in with Apple.');
   }
 
   // Verify password
@@ -166,6 +173,85 @@ export async function resetPassword(token: string, newPassword: string): Promise
   // This is a simplified implementation
   // In production, you'd store reset tokens in the database with expiry
   throw new NotFoundError('Password reset not implemented in mock mode');
+}
+
+function formatUserResponse(user: any) {
+  return {
+    id: user.id,
+    email: user.email,
+    display_name: user.displayName,
+    phone_number: user.phoneNumber,
+    profile_photo_url: user.profilePhotoUrl,
+    subscription_tier: user.subscriptionTier,
+    created_at: user.createdAt,
+  };
+}
+
+export async function appleSignIn(input: AppleSignInInput): Promise<UserWithTokens> {
+  // 1. Verify the Apple identity token
+  let applePayload: any;
+  try {
+    applePayload = await appleSignin.verifyIdToken(input.identity_token, {
+      audience: APPLE_CLIENT_ID,
+      ignoreExpiration: false,
+    });
+  } catch {
+    throw new UnauthorizedError('Invalid Apple identity token');
+  }
+
+  const appleUserId = applePayload.sub;
+  const appleEmail = applePayload.email || input.email;
+
+  // Verify the Apple user ID matches what the client sent
+  if (appleUserId !== input.apple_user_id) {
+    throw new UnauthorizedError('Apple user ID mismatch');
+  }
+
+  // 2. Look up existing user by Apple User ID
+  let user = await prisma.user.findUnique({
+    where: { appleUserId },
+  });
+
+  if (user) {
+    const tokens = await createTokensForUser(user.id, user.email);
+    return { user: formatUserResponse(user), ...tokens };
+  }
+
+  // 3. Check if a user exists with the same email (account linking)
+  if (appleEmail) {
+    user = await prisma.user.findUnique({
+      where: { email: appleEmail },
+    });
+
+    if (user) {
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          appleUserId,
+          authProvider: user.passwordHash ? 'both' : 'apple',
+        },
+      });
+      const tokens = await createTokensForUser(user.id, user.email);
+      return { user: formatUserResponse(user), ...tokens };
+    }
+  }
+
+  // 4. Create new user
+  const displayName = input.full_name || appleEmail?.split('@')[0] || 'Apple User';
+  const email = appleEmail || `apple_${appleUserId}@privaterelay.appleid.com`;
+
+  user = await prisma.user.create({
+    data: {
+      email,
+      passwordHash: null,
+      displayName,
+      appleUserId,
+      authProvider: 'apple',
+    },
+  });
+
+  const tokens = await createTokensForUser(user.id, user.email);
+  return { user: formatUserResponse(user), ...tokens };
 }
 
 async function createTokensForUser(userId: string, email: string): Promise<AuthTokens> {

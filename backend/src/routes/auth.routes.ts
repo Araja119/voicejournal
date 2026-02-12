@@ -8,6 +8,7 @@ import {
   refreshSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
+  appleSignInSchema,
 } from '../validators/auth.validators.js';
 import * as authService from '../services/auth.service.js';
 import { success, created } from '../utils/responses.js';
@@ -67,6 +68,20 @@ router.post(
     try {
       await authService.logout(req.user!.userId);
       success(res, { message: 'Logged out successfully' });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// POST /auth/apple
+router.post(
+  '/apple',
+  validate({ body: appleSignInSchema }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await authService.appleSignIn(req.body);
+      success(res, result);
     } catch (err) {
       next(err);
     }

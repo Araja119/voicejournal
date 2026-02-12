@@ -92,6 +92,33 @@ struct LoginView: View {
                             Task { await viewModel.login(appState: appState) }
                         }
 
+                        // Divider
+                        HStack {
+                            Rectangle()
+                                .fill(colors.textSecondary.opacity(0.3))
+                                .frame(height: 1)
+                            Text("or")
+                                .font(AppTypography.caption)
+                                .foregroundColor(colors.textSecondary)
+                            Rectangle()
+                                .fill(colors.textSecondary.opacity(0.3))
+                                .frame(height: 1)
+                        }
+
+                        // Apple Sign In
+                        AppleSignInButtonView(
+                            isLoading: viewModel.isAppleSigningIn
+                        ) {
+                            Task { await viewModel.signInWithApple(appState: appState) }
+                        }
+
+                        if let error = viewModel.appleSignInError {
+                            Text(error)
+                                .font(AppTypography.bodySmall)
+                                .foregroundColor(.red)
+                                .multilineTextAlignment(.center)
+                        }
+
                         Spacer()
                     }
                     .padding(.horizontal, Theme.Spacing.lg)

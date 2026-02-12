@@ -6,6 +6,7 @@ struct OnboardingView: View {
     @State private var showingLogin = false
     @State private var showingSignup = false
     @State private var showingExplore = false
+    @StateObject private var authViewModel = AuthViewModel()
 
     var body: some View {
         let colors = AppColors(colorScheme)
@@ -66,6 +67,20 @@ struct OnboardingView: View {
                                 .padding(.vertical, Theme.Spacing.md)
                                 .background(colors.surface)
                                 .cornerRadius(Theme.Radius.md)
+                        }
+
+                        // Apple Sign In
+                        AppleSignInButtonView(
+                            isLoading: authViewModel.isAppleSigningIn
+                        ) {
+                            Task { await authViewModel.signInWithApple(appState: appState) }
+                        }
+
+                        if let error = authViewModel.appleSignInError {
+                            Text(error)
+                                .font(AppTypography.bodySmall)
+                                .foregroundColor(.red)
+                                .multilineTextAlignment(.center)
                         }
 
                         // Login link

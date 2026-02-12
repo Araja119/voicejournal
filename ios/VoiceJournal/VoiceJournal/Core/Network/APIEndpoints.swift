@@ -5,7 +5,7 @@ enum APIConfig {
     #if DEBUG
     static let baseURL = "http://localhost:3000/v1"
     #else
-    static let baseURL = "https://api.voicejournal.app/v1"
+    static let baseURL = "https://invigorating-amazement-production-81b6.up.railway.app/v1"
     #endif
 
     static let timeout: TimeInterval = 30
@@ -21,6 +21,7 @@ enum APIEndpoint {
     case logout
     case forgotPassword
     case resetPassword
+    case appleSignIn
 
     // Users
     case currentUser
@@ -95,6 +96,7 @@ enum APIEndpoint {
         case .logout: return "/auth/logout"
         case .forgotPassword: return "/auth/forgot-password"
         case .resetPassword: return "/auth/reset-password"
+        case .appleSignIn: return "/auth/apple"
 
         // Users
         case .currentUser, .updateUser: return "/users/me"
@@ -185,7 +187,7 @@ enum APIEndpoint {
             return .get
 
         // POST
-        case .signup, .login, .refresh, .logout, .forgotPassword, .resetPassword,
+        case .signup, .login, .refresh, .logout, .forgotPassword, .resetPassword, .appleSignIn,
              .uploadProfilePhoto, .registerPushToken,
              .createJournal, .uploadCoverImage, .addCollaborator,
              .createPerson, .uploadPersonPhoto,
@@ -210,7 +212,7 @@ enum APIEndpoint {
     // MARK: - Requires Auth
     var requiresAuth: Bool {
         switch self {
-        case .signup, .login, .refresh, .forgotPassword, .resetPassword,
+        case .signup, .login, .refresh, .forgotPassword, .resetPassword, .appleSignIn,
              .templates, .relationships,
              .recordingPage, .uploadRecording:
             return false

@@ -22,7 +22,7 @@ RUN npm run build
 # Production stage
 FROM node:20-alpine AS runner
 
-RUN apk add --no-cache openssl
+RUN apk add --no-cache openssl netcat-openbsd
 
 WORKDIR /app
 
@@ -37,12 +37,16 @@ RUN npx prisma generate
 # Copy built files from builder
 COPY --from=builder /app/dist ./dist/
 
+# Copy startup script
+COPY start.sh ./
+RUN chmod +x start.sh
+
 # Railway injects PORT env var
 EXPOSE ${PORT:-3000}
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+# Health check - give more time for startup
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT:-3000}/health || exit 1
 
-# Run migrations and start server
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
+# Run startup script (waits for DB, runs migrations, starts server)
+CMD ["./start.sh"]

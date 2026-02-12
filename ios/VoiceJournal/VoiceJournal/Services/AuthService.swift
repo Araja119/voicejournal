@@ -65,6 +65,29 @@ class AuthService {
         return try await client.request(.resetPassword, body: request)
     }
 
+    // MARK: - Apple Sign In
+    func appleSignIn(identityToken: String, authorizationCode: String,
+                     appleUserId: String, email: String?,
+                     fullName: String?) async throws -> AuthResponse {
+        struct AppleSignInRequest: Codable {
+            let identityToken: String
+            let authorizationCode: String
+            let appleUserId: String
+            let email: String?
+            let fullName: String?
+        }
+
+        let request = AppleSignInRequest(
+            identityToken: identityToken,
+            authorizationCode: authorizationCode,
+            appleUserId: appleUserId,
+            email: email,
+            fullName: fullName
+        )
+
+        return try await client.request(.appleSignIn, body: request)
+    }
+
     // MARK: - Get Current User
     func getCurrentUser() async throws -> User {
         return try await client.request(.currentUser)
