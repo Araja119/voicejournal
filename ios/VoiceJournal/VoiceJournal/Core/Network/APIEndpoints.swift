@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - API Configuration
 enum APIConfig {
-    #if DEBUG
+    #if targetEnvironment(simulator)
     static let baseURL = "http://localhost:3000/v1"
     #else
     static let baseURL = "https://invigorating-amazement-production-81b6.up.railway.app/v1"

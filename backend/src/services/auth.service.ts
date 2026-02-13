@@ -215,6 +215,13 @@ export async function appleSignIn(input: AppleSignInInput): Promise<UserWithToke
   });
 
   if (user) {
+    // Update display name if Apple provides it and current name is a fallback
+    if (input.full_name && (!user.displayName || user.displayName === 'Friend' || user.displayName === 'Apple User')) {
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: { displayName: input.full_name },
+      });
+    }
     const tokens = await createTokensForUser(user.id, user.email);
     return { user: formatUserResponse(user), ...tokens };
   }
@@ -239,7 +246,10 @@ export async function appleSignIn(input: AppleSignInInput): Promise<UserWithToke
   }
 
   // 4. Create new user
-  const displayName = input.full_name || appleEmail?.split('@')[0] || 'Apple User';
+  // Apple private relay emails look like "abc123@privaterelay.appleid.com"
+  const isPrivateRelay = appleEmail?.includes('privaterelay.appleid.com');
+  const emailPrefix = appleEmail?.split('@')[0];
+  const displayName = input.full_name || (!isPrivateRelay && emailPrefix ? emailPrefix : null) || 'Friend';
   const email = appleEmail || `apple_${appleUserId}@privaterelay.appleid.com`;
 
   user = await prisma.user.create({
