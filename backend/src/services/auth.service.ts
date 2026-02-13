@@ -195,7 +195,9 @@ export async function appleSignIn(input: AppleSignInInput): Promise<UserWithToke
       audience: APPLE_CLIENT_ID,
       ignoreExpiration: false,
     });
-  } catch {
+  } catch (err: any) {
+    console.error('Apple token verification failed:', err.message || err);
+    console.error('APPLE_CLIENT_ID used:', APPLE_CLIENT_ID);
     throw new UnauthorizedError('Invalid Apple identity token');
   }
 
