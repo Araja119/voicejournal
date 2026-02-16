@@ -228,7 +228,7 @@ export async function deletePerson(userId: string, personId: string): Promise<vo
 
   // Cascade delete all journals dedicated to this person
   const dedicatedJournals = await prisma.journal.findMany({
-    where: { dedicatedToPersonId: personId, userId },
+    where: { dedicatedToPersonId: personId, ownerId: userId },
   });
 
   for (const journal of dedicatedJournals) {
