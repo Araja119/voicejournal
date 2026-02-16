@@ -58,7 +58,7 @@ struct CreateJournalSheet: View {
                                             Image(systemName: "person.crop.circle")
                                                 .font(.system(size: 24))
                                                 .foregroundColor(colors.textSecondary)
-                                            Text("Select a person (optional)")
+                                            Text("Select a person")
                                                 .foregroundColor(colors.textSecondary)
                                         }
                                         Spacer()
@@ -103,33 +103,6 @@ struct CreateJournalSheet: View {
                                             .padding(.vertical, Theme.Spacing.sm)
                                             .background(colors.accentPrimary.opacity(0.05))
                                         }
-                                    }
-
-                                    Divider()
-                                        .background(colors.background)
-
-                                    // No one option
-                                    Button(action: {
-                                        selectedPerson = nil
-                                        withAnimation { isPersonPickerExpanded = false }
-                                    }) {
-                                        HStack {
-                                            Image(systemName: "person.slash")
-                                                .font(.system(size: 18))
-                                                .foregroundColor(colors.textSecondary)
-                                                .frame(width: 28)
-                                            Text("No one specific")
-                                                .foregroundColor(colors.textPrimary)
-                                            Spacer()
-                                            if selectedPerson == nil {
-                                                Image(systemName: "checkmark")
-                                                    .font(.system(size: 14, weight: .semibold))
-                                                    .foregroundColor(colors.accentPrimary)
-                                            }
-                                        }
-                                        .font(AppTypography.bodyMedium)
-                                        .padding(.horizontal, Theme.Spacing.md)
-                                        .padding(.vertical, Theme.Spacing.sm)
                                     }
 
                                     // People list (excluding myself)

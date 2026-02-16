@@ -68,7 +68,7 @@ export async function listPeople(userId: string): Promise<PersonSummary[]> {
 }
 
 export async function createPerson(userId: string, input: CreatePersonInput & { linked_user_id?: string }): Promise<PersonSummary> {
-  const person = await prisma.person.create({
+  let person = await prisma.person.create({
     data: {
       ownerId: userId,
       name: input.name,
@@ -78,6 +78,20 @@ export async function createPerson(userId: string, input: CreatePersonInput & { 
       linkedUserId: input.linked_user_id || null,
     },
   });
+
+  // Auto-sync profile photo from linked user for "self" persons
+  if (person.relationship === 'self' && person.linkedUserId) {
+    const linkedUser = await prisma.user.findUnique({
+      where: { id: person.linkedUserId },
+      select: { profilePhotoUrl: true },
+    });
+    if (linkedUser?.profilePhotoUrl) {
+      person = await prisma.person.update({
+        where: { id: person.id },
+        data: { profilePhotoUrl: linkedUser.profilePhotoUrl },
+      });
+    }
+  }
 
   return {
     id: person.id,
