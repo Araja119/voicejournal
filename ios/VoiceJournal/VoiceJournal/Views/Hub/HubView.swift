@@ -12,6 +12,7 @@ struct HubView: View {
     @State private var showingJournals = false
     @State private var navigateToJournalId: String?
     @State private var hasLoadedOnce = false
+    @State private var showingTutorial = false
 
     // Carousel state
     @State private var currentCarouselIndex = 0
@@ -73,6 +74,10 @@ struct HubView: View {
             .sheet(isPresented: $showingSendQuestion) {
                 SendQuestionSheet()
             }
+            .fullScreenCover(isPresented: $showingTutorial) {
+                FirstTimeTutorialView()
+                    .environmentObject(appState)
+            }
             .task {
                 // Only load once to prevent glitching on navigation back
                 if !hasLoadedOnce {
@@ -80,6 +85,20 @@ struct HubView: View {
                     hasLoadedOnce = true
                     startCarouselTimer()
                 }
+            }
+            .onAppear {
+                if !appState.hasSeenTutorial {
+                    showingTutorial = true
+                }
+            }
+            .onChange(of: showingSendQuestion) { _, isShowing in
+                if !isShowing { Task { await activityViewModel.loadActivity() } }
+            }
+            .onChange(of: showingJournals) { _, isShowing in
+                if !isShowing { Task { await activityViewModel.loadActivity() } }
+            }
+            .onChange(of: showingPeople) { _, isShowing in
+                if !isShowing { Task { await activityViewModel.loadActivity() } }
             }
             .refreshable {
                 await activityViewModel.loadActivity()

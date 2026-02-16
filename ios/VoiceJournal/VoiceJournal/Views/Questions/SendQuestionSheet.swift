@@ -15,6 +15,7 @@ struct SendQuestionSheet: View {
     @State private var isSending = false
     @State private var error: String?
     @State private var step: SendQuestionStep = .selectPerson
+    @State private var showingAddPerson = false
 
     enum SendQuestionStep {
         case selectPerson
@@ -122,12 +123,36 @@ struct SendQuestionSheet: View {
         if peopleViewModel.isLoading {
             LoadingView()
         } else if peopleViewModel.people.isEmpty {
-            EmptyStateView(
-                icon: "person.2",
-                title: "No People Yet",
-                message: "Add people first to send them questions",
-                colors: colors
-            )
+            VStack(spacing: Theme.Spacing.lg) {
+                EmptyStateView(
+                    icon: "person.2",
+                    title: "No People Yet",
+                    message: "Add people first to send them questions",
+                    colors: colors
+                )
+
+                Button(action: { showingAddPerson = true }) {
+                    HStack {
+                        Image(systemName: "person.badge.plus")
+                        Text("Add People")
+                    }
+                    .font(AppTypography.labelLarge)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, Theme.Spacing.md)
+                    .background(colors.accentPrimary)
+                    .cornerRadius(Theme.Radius.md)
+                }
+                .padding(.horizontal, Theme.Spacing.lg)
+            }
+            .fullScreenCover(isPresented: $showingAddPerson) {
+                PeopleListView()
+            }
+            .onChange(of: showingAddPerson) { _, isShowing in
+                if !isShowing {
+                    Task { await peopleViewModel.loadPeople() }
+                }
+            }
         } else {
             ScrollView {
                 LazyVStack(spacing: Theme.Spacing.sm) {
@@ -368,6 +393,7 @@ struct SendQuestionSheet: View {
     }
 
     private func sendQuestion() {
+        guard !isSending else { return }
         guard let journal = selectedJournal,
               let person = selectedPerson else { return }
 
@@ -386,9 +412,12 @@ struct SendQuestionSheet: View {
                     request
                 )
 
-                // Send the assignment via email
-                if let assignment = question.assignments?.first {
-                    _ = try await QuestionService.shared.sendAssignment(
+                // Try to send the assignment via email if person has an email
+                // For self-persons or people without email, question is saved as draft
+                if let assignment = question.assignments?.first,
+                   !person.isSelf,
+                   let email = person.email, !email.isEmpty {
+                    _ = try? await QuestionService.shared.sendAssignment(
                         assignmentId: assignment.id,
                         channel: .email
                     )
@@ -396,7 +425,7 @@ struct SendQuestionSheet: View {
 
                 dismiss()
             } catch {
-                self.error = "Failed to send question"
+                self.error = "Failed to create question"
             }
             isSending = false
         }
@@ -413,7 +442,6 @@ struct CreateJournalForPersonSheet: View {
 
     @State private var title = ""
     @State private var description = ""
-    @State private var privacySetting = "private"
     @State private var isSaving = false
     @State private var error: String?
 
@@ -470,20 +498,6 @@ struct CreateJournalForPersonSheet: View {
                                 .cornerRadius(Theme.Radius.md)
                         }
 
-                        // Privacy Setting
-                        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                            Text("Privacy")
-                                .font(AppTypography.labelMedium)
-                                .foregroundColor(colors.textSecondary)
-
-                            Picker("Privacy", selection: $privacySetting) {
-                                Text("Private").tag("private")
-                                Text("Shared").tag("shared")
-                                Text("Public").tag("public")
-                            }
-                            .pickerStyle(.segmented)
-                        }
-
                         if let error = error {
                             Text(error)
                                 .font(AppTypography.bodySmall)
@@ -522,7 +536,7 @@ struct CreateJournalForPersonSheet: View {
                 let request = CreateJournalRequest(
                     title: title,
                     description: description.isEmpty ? nil : description,
-                    privacySetting: privacySetting,
+                    privacySetting: "private",
                     dedicatedToPersonId: person.id
                 )
                 let journal = try await JournalService.shared.createJournal(request)

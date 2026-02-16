@@ -226,6 +226,18 @@ export async function deletePerson(userId: string, personId: string): Promise<vo
     throw new ForbiddenError('You do not have access to this person');
   }
 
+  // Cascade delete all journals dedicated to this person
+  const dedicatedJournals = await prisma.journal.findMany({
+    where: { dedicatedToPersonId: personId, userId },
+  });
+
+  for (const journal of dedicatedJournals) {
+    // Delete questions (and their assignments/recordings) then the journal
+    await prisma.journal.delete({
+      where: { id: journal.id },
+    });
+  }
+
   await prisma.person.delete({
     where: { id: personId },
   });

@@ -103,6 +103,11 @@ struct ProfileEditView: View {
         .navigationTitle("Edit Profile")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button("Cancel") { dismiss() }
+                    .foregroundColor(colors.textSecondary)
+            }
+
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: save) {
                     if isSaving {

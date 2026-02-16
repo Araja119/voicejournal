@@ -7,6 +7,7 @@ struct PeopleListView: View {
     @StateObject private var viewModel = PeopleViewModel()
     @State private var showingAddPerson = false
     @State private var selectedPerson: Person?
+    @State private var showingProfileEdit = false
 
     var body: some View {
         let colors = AppColors(colorScheme)
@@ -20,9 +21,12 @@ struct PeopleListView: View {
                 } else {
                     ScrollView {
                         LazyVStack(spacing: Theme.Spacing.md) {
-                            // Myself card (always at top)
+                            // Myself card (always at top, tappable to edit profile)
                             if let myself = viewModel.myselfPerson {
                                 MyselfCard(person: myself, colors: colors)
+                                    .onTapGesture {
+                                        showingProfileEdit = true
+                                    }
                             }
 
                             // Section header for family & friends
@@ -87,25 +91,38 @@ struct PeopleListView: View {
             }
             .sheet(isPresented: $showingAddPerson) {
                 AddPersonSheet(onSave: { _ in
-                    Task { await viewModel.loadPeople() }
+                    Task { await reloadPeople() }
                 })
             }
             .sheet(item: $selectedPerson) { person in
                 EditPersonSheet(person: person, onSave: {
-                    Task { await viewModel.loadPeople() }
+                    Task { await reloadPeople() }
                 }, onDelete: {
-                    Task { await viewModel.loadPeople() }
+                    Task { await reloadPeople() }
                 })
+            }
+            .sheet(isPresented: $showingProfileEdit) {
+                NavigationStack {
+                    ProfileEditView()
+                        .environmentObject(appState)
+                }
+            }
+            .onChange(of: showingProfileEdit) { _, isShowing in
+                if !isShowing {
+                    Task { await reloadPeople() }
+                }
             }
         }
         .task {
-            // Load people first
-            await viewModel.loadPeople()
+            await reloadPeople()
+        }
+    }
 
-            // If no "myself" person from database, create synthetic one from current user
-            if viewModel.myselfPerson == nil, let user = appState.currentUser {
-                viewModel.createSyntheticMyself(from: user)
-            }
+    /// Loads people from API and ensures "Myself" card is always present with latest user data
+    private func reloadPeople() async {
+        await viewModel.loadPeople()
+        if let user = appState.currentUser {
+            viewModel.refreshSyntheticMyself(from: user)
         }
     }
 }
@@ -159,6 +176,7 @@ struct MyselfCard: View {
                 .stroke(colorScheme == .dark ? Color.white.opacity(0.06) : Color.black.opacity(0.05), lineWidth: 1)
         )
         .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.30 : 0.12), radius: 12, x: 0, y: 6)
+        .contentShape(Rectangle())
     }
 }
 

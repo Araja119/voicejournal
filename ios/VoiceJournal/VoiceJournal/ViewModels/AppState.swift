@@ -17,6 +17,9 @@ class AppState: ObservableObject {
         isDarkMode ? .dark : .light
     }
 
+    // MARK: - Tutorial
+    @Published var hasSeenTutorial: Bool = UserDefaults.standard.bool(forKey: "hasSeenTutorial")
+
     // MARK: - Navigation
     @Published var showingMenu = false
 
@@ -124,8 +127,16 @@ class AppState: ObservableObject {
         }
         await authManager.clearTokens()
         UserDefaults.standard.removeObject(forKey: "appleUserId")
+        self.hasSeenTutorial = false
+        UserDefaults.standard.set(false, forKey: "hasSeenTutorial")
         self.currentUser = nil
         self.isAuthenticated = false
+    }
+
+    // MARK: - Tutorial
+    func completeTutorial() {
+        hasSeenTutorial = true
+        UserDefaults.standard.set(true, forKey: "hasSeenTutorial")
     }
 
     // MARK: - Theme

@@ -17,8 +17,10 @@ class PeopleViewModel: ObservableObject {
 
         do {
             let allPeople = try await peopleService.listPeople()
-            // Separate "myself" from other people
-            myselfPerson = allPeople.first(where: { $0.isSelf })
+            // Update myselfPerson from API if available, otherwise keep existing (synthetic)
+            if let apiMyself = allPeople.first(where: { $0.isSelf }) {
+                myselfPerson = apiMyself
+            }
             people = allPeople.filter { !$0.isSelf }
         } catch {
             self.error = "Failed to load people"
@@ -27,12 +29,13 @@ class PeopleViewModel: ObservableObject {
         isLoading = false
     }
 
-    /// Creates a synthetic "Myself" person from the current user for display purposes
-    func createSyntheticMyself(from user: User) {
-        // If we already have a real "myself" person from the database, don't override
-        if myselfPerson != nil { return }
+    /// Creates or updates a synthetic "Myself" person from the current user for display purposes.
+    /// If a real person from the API exists, it won't be overridden.
+    func refreshSyntheticMyself(from user: User) {
+        // If we have a real "myself" person from the database (not synthetic), don't override
+        if let existing = myselfPerson, !existing.id.hasPrefix("myself-") { return }
 
-        // Create a synthetic person for display
+        // Create or update synthetic person with latest user data
         myselfPerson = Person(
             id: "myself-\(user.id)",
             name: user.displayName,

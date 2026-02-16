@@ -465,10 +465,22 @@ For child views with action menus (like QuestionTimelineCard):
 - [x] Play button in timeline (fully functional end-to-end)
 - [x] Microphone permission handling with Settings redirect
 - [x] Re-record option in review screen
-- [x] Apple Sign-In — full backend + iOS implementation (code complete, not yet deployed)
-- [x] App icon generated (1024x1024, orange-to-coral gradient)
+- [x] Apple Sign-In — full backend + iOS implementation, deployed to Railway
+- [x] App icon (cloud/microphone design, purple/orange theme)
 - [x] TestFlight build uploaded (1.0 build 3) to App Store Connect
 - [x] Export compliance resolved for TestFlight
+- [x] First-time user tutorial (4-step frosted glass overlay on HubView)
+- [x] Tutorial resets on logout so new accounts see it again
+- [x] "Add People" button in Send Question empty state
+- [x] Privacy picker removed from journal creation (all journals default to private)
+- [x] Home screen auto-refreshes activity after dismissing sheets
+- [x] Cascade delete: deleting a person also deletes all their journals, questions, and recordings
+- [x] Two-step delete confirmation for people (warns about cascade deletion)
+- [x] Myself card tappable → opens Edit Profile (name, phone, photo)
+- [x] Myself card persists after Cancel (synthetic person preserved across API reloads)
+- [x] Profile photo/name changes sync to Myself card immediately via `refreshSyntheticMyself`
+- [x] Send question fix: re-entry guard prevents duplicate questions, graceful handling when person has no email
+- [x] ProfileEditView Cancel button added for sheet dismissal
 
 ### TODO - Feature Completion
 - [x] "Send to [Name]" in timeline — wired to QuestionService.sendAssignment
@@ -476,6 +488,10 @@ For child views with action menus (like QuestionTimelineCard):
 - [x] Copy Link — copies recording link to clipboard with haptic feedback
 - [x] Resend — resends assignment via email
 - [ ] **Delete recording from timeline** — Backend `deleteRecording()` exists, no UI button
+- [ ] **Account deletion** — Required by App Store. Need DELETE `/users/me` endpoint + Settings UI with confirmation
+- [ ] **Image compression** — Profile photos uploaded at full resolution, need `jpegData(compressionQuality:)` before upload
+- [ ] **Push notifications** — Backend push token endpoint exists, iOS implementation missing (Firebase FCM)
+- [ ] **Search** — No search in journals, people, or recordings lists
 
 ### TODO - Deployment (Phase 1 — Complete)
 - [x] Backend Dockerfile + railway.toml for Railway deployment
@@ -520,8 +536,9 @@ For child views with action menus (like QuestionTimelineCard):
 - `EMAIL_PROVIDER` — resend
 - `RESEND_API_KEY` — Set
 
+- `APPLE_CLIENT_ID` — ARaja.VoiceJournal
+
 **Not yet configured:**
-- `APPLE_CLIENT_ID` — Needed for Apple Sign-In token verification (should be `ARaja.VoiceJournal`)
 - `ANTHROPIC_API_KEY` — Needed for AI question suggestions (optional)
 
 #### Cloudflare R2 Details
@@ -596,6 +613,23 @@ Full Apple Sign-In implementation is code-complete on both backend and iOS. Buil
 - Backend verifies Google tokens
 - Can coexist with email/password and Apple auth
 - Deferred until after Apple Sign-In is tested
+
+### First-Time Tutorial
+- **File**: `Views/Tutorial/FirstTimeTutorialView.swift`
+- 4-step full-screen overlay presented via `.fullScreenCover` on HubView
+- Steps: Welcome → Add People → Send Question → Listen Back
+- Uses frosted glass card (`.glassCard()`) with `GlassIconCircle`, `GlassTextColors`
+- Dot indicators for progress, "Skip" button always visible
+- State tracked via `AppState.hasSeenTutorial` (persisted in UserDefaults)
+- Resets on logout so new accounts see the tutorial
+
+### Person Deletion (Cascade)
+- Deleting a person cascade-deletes ALL journals dedicated to that person (and their questions/assignments/recordings)
+- Two-step confirmation dialog:
+  1. First: "Delete [Name]? This will permanently delete them along with ALL of their journals, questions, and voice recordings."
+  2. Second: "Are you absolutely sure? This cannot be undone."
+- Backend: `people.service.ts` `deletePerson()` finds and deletes dedicated journals before deleting the person
+- iOS: `EditPersonSheet.swift` uses `confirmationDialog` → `alert` two-step flow
 
 ### TODO - Core Loop (Phase 2 — Code Complete)
 - [x] Web recording page for recipients (server-rendered HTML)
@@ -762,4 +796,4 @@ model QuestionAssignment {
 - Backend: `/Users/ARaja/voicejournal/backend/`
 
 ---
-*Last updated: February 11, 2026 — Apple Developer account activated. TestFlight build 1.0 (3) uploaded to App Store Connect (app name: "VoiceJournal: Stories"). Apple Sign-In fully implemented on backend + iOS (code complete, builds successfully). Pending: deploy backend Apple Sign-In changes to Railway, add APPLE_CLIENT_ID env var, add Sign in with Apple Xcode capability, test on physical iPhone, upload new TestFlight build with Apple Sign-In.*
+*Last updated: February 16, 2026 — First-time tutorial added, cascade delete for people, Myself card tappable with profile edit, send question flow fixed, profile photo syncs to Myself card. Next priorities: account deletion (App Store requirement), image compression, push notifications.*

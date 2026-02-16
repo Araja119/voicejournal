@@ -18,6 +18,7 @@ struct EditPersonSheet: View {
     @State private var isSaving = false
     @State private var isDeleting = false
     @State private var showingDeleteConfirmation = false
+    @State private var showingFinalDeleteConfirmation = false
     @State private var error: String?
 
     init(person: Person, onSave: @escaping () -> Void, onDelete: @escaping () -> Void) {
@@ -217,10 +218,21 @@ struct EditPersonSheet: View {
                 isPresented: $showingDeleteConfirmation,
                 titleVisibility: .visible
             ) {
-                Button("Delete", role: .destructive) { deletePerson() }
+                Button("Delete \(person.name)", role: .destructive) {
+                    showingFinalDeleteConfirmation = true
+                }
                 Button("Cancel", role: .cancel) {}
             } message: {
-                Text("This action cannot be undone. All recordings from this person will remain in your journals.")
+                Text("This will permanently delete \(person.name) along with ALL of their journals, questions, and voice recordings.")
+            }
+            .alert(
+                "Are you absolutely sure?",
+                isPresented: $showingFinalDeleteConfirmation
+            ) {
+                Button("Cancel", role: .cancel) {}
+                Button("Delete Everything", role: .destructive) { deletePerson() }
+            } message: {
+                Text("This cannot be undone. All journals, questions, and voice recordings for \(person.name) will be permanently deleted.")
             }
         }
     }

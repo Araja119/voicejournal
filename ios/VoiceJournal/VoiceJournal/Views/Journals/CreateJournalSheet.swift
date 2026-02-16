@@ -10,7 +10,6 @@ struct CreateJournalSheet: View {
 
     @State private var title = ""
     @State private var description = ""
-    @State private var privacySetting = "private"
     @State private var selectedPerson: Person?
     @State private var isPersonPickerExpanded = false
     @State private var showingAddPerson = false
@@ -214,25 +213,6 @@ struct CreateJournalSheet: View {
                                 .cornerRadius(Theme.Radius.md)
                         }
 
-                        // Privacy Setting
-                        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                            Text("Privacy")
-                                .font(AppTypography.labelMedium)
-                                .foregroundColor(colors.textSecondary)
-
-                            Picker("Privacy", selection: $privacySetting) {
-                                Text("Private").tag("private")
-                                Text("Shared").tag("shared")
-                                Text("Public").tag("public")
-                            }
-                            .pickerStyle(.segmented)
-                        }
-
-                        // Privacy explanation
-                        Text(privacyExplanation)
-                            .font(AppTypography.caption)
-                            .foregroundColor(colors.textSecondary)
-
                         if let error = error {
                             Text(error)
                                 .font(AppTypography.bodySmall)
@@ -264,9 +244,9 @@ struct CreateJournalSheet: View {
             // Load people first
             await peopleViewModel.loadPeople()
 
-            // If no "myself" person from database, create synthetic one from current user
-            if peopleViewModel.myselfPerson == nil, let user = appState.currentUser {
-                peopleViewModel.createSyntheticMyself(from: user)
+            // Ensure "myself" person exists with latest user data
+            if let user = appState.currentUser {
+                peopleViewModel.refreshSyntheticMyself(from: user)
             }
         }
         .sheet(isPresented: $showingAddPerson) {
@@ -282,19 +262,6 @@ struct CreateJournalSheet: View {
                     }
                 }
             }
-        }
-    }
-
-    private var privacyExplanation: String {
-        switch privacySetting {
-        case "private":
-            return "Only you can see this journal."
-        case "shared":
-            return "You can invite specific people to view this journal."
-        case "public":
-            return "Anyone with the link can view this journal."
-        default:
-            return ""
         }
     }
 
@@ -316,7 +283,7 @@ struct CreateJournalSheet: View {
                 let request = CreateJournalRequest(
                     title: title,
                     description: description.isEmpty ? nil : description,
-                    privacySetting: privacySetting,
+                    privacySetting: "private",
                     dedicatedToPersonId: dedicatedPersonId
                 )
                 let journal = try await JournalService.shared.createJournal(request)
