@@ -487,9 +487,9 @@ For child views with action menus (like QuestionTimelineCard):
 - [x] "Remind" button — wired with escalating cooldown (1h → 24h → 72h)
 - [x] Copy Link — copies recording link to clipboard with haptic feedback
 - [x] Resend — resends assignment via email
-- [ ] **Delete recording from timeline** — Backend `deleteRecording()` exists, no UI button
-- [ ] **Account deletion** — Required by App Store. Need DELETE `/users/me` endpoint + Settings UI with confirmation
-- [ ] **Image compression** — Profile photos uploaded at full resolution, need `jpegData(compressionQuality:)` before upload
+- [x] **Delete recording from timeline** — Menu option with confirmation dialog, refreshes journal after deletion
+- [x] **Account deletion** — DELETE `/users/me` endpoint + Settings UI with two-step confirmation
+- [x] **Image compression** — `ImageUtils.compressForUpload()` helper, applied to all 4 upload sites
 - [ ] **Push notifications** — Backend push token endpoint exists, iOS implementation missing (Firebase FCM)
 - [ ] **Search** — No search in journals, people, or recordings lists
 

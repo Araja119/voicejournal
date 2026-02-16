@@ -133,6 +133,17 @@ class AppState: ObservableObject {
         self.isAuthenticated = false
     }
 
+    // MARK: - Delete Account
+    func deleteAccount() async throws {
+        try await AuthService.shared.deleteAccount()
+        await authManager.clearTokens()
+        UserDefaults.standard.removeObject(forKey: "appleUserId")
+        self.hasSeenTutorial = false
+        UserDefaults.standard.set(false, forKey: "hasSeenTutorial")
+        self.currentUser = nil
+        self.isAuthenticated = false
+    }
+
     // MARK: - Tutorial
     func completeTutorial() {
         hasSeenTutorial = true

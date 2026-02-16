@@ -166,6 +166,22 @@ export async function registerPushToken(userId: string, input: PushTokenInput): 
   });
 }
 
+export async function deleteAccount(userId: string): Promise<void> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+  });
+
+  if (!user) {
+    throw new NotFoundError('User');
+  }
+
+  // Prisma cascade rules handle all related data:
+  // journals, questions, assignments, recordings, people, tokens, notifications
+  await prisma.user.delete({
+    where: { id: userId },
+  });
+}
+
 export async function getUserPushTokens(userId: string): Promise<string[]> {
   const tokens = await prisma.pushToken.findMany({
     where: { userId },

@@ -47,6 +47,11 @@ struct JournalDetailView: View {
     @State private var sendingQuestionId: String?
     @State private var sendError: String?
 
+    // Recording deletion state
+    @State private var recordingToDelete: String? // recording ID
+    @State private var showingDeleteRecordingConfirmation = false
+    @State private var isDeletingRecording = false
+
     // Journal editing state
     @State private var showingEditJournal = false
     @State private var editedJournalTitle = ""
@@ -149,6 +154,20 @@ struct JournalDetailView: View {
             }
         } message: {
             Text("This action cannot be undone.")
+        }
+        .confirmationDialog(
+            "Delete this recording?",
+            isPresented: $showingDeleteRecordingConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete Recording", role: .destructive) {
+                deleteRecording()
+            }
+            Button("Cancel", role: .cancel) {
+                recordingToDelete = nil
+            }
+        } message: {
+            Text("The voice recording will be permanently deleted. The question will revert to its previous state.")
         }
         .sheet(isPresented: $showingAddQuestion) {
             CreateQuestionSheet(journalId: journalId) {
@@ -286,6 +305,22 @@ struct JournalDetailView: View {
             }
             questionToDelete = nil
             isDeletingQuestion = false
+        }
+    }
+
+    private func deleteRecording() {
+        guard let recordingId = recordingToDelete else { return }
+        isDeletingRecording = true
+
+        Task {
+            do {
+                try await RecordingService.shared.deleteRecording(id: recordingId)
+                await viewModel.loadJournal(id: journalId)
+            } catch {
+                print("Failed to delete recording: \(error)")
+            }
+            recordingToDelete = nil
+            isDeletingRecording = false
         }
     }
 
@@ -919,6 +954,12 @@ struct JournalDetailView: View {
                         onRemindTapped: { assignment in
                             sendReminder(for: assignment)
                         },
+                        onDeleteRecordingTapped: question.assignments?.first(where: { $0.status == .answered })?.recording != nil ? {
+                            if let recording = question.assignments?.first(where: { $0.status == .answered })?.recording {
+                                recordingToDelete = recording.id
+                                showingDeleteRecordingConfirmation = true
+                            }
+                        } : nil,
                         sendingQuestionId: sendingQuestionId,
                         remindingAssignmentId: remindingAssignmentId,
                         remindSuccessAssignmentId: remindSuccessAssignmentId
@@ -1007,6 +1048,7 @@ struct QuestionTimelineCard: View {
     var onRecordTapped: () -> Void = {}
     var onPlayTapped: ((Assignment) -> Void)?
     var onRemindTapped: ((Assignment) -> Void)?
+    var onDeleteRecordingTapped: (() -> Void)?
 
     // Send/Remind UI state (passed from parent)
     var sendingQuestionId: String?
@@ -1051,8 +1093,13 @@ struct QuestionTimelineCard: View {
                         Button(action: onResendTapped) {
                             Label("Resend", systemImage: "arrow.clockwise")
                         }
+                        if state == .answered, let onDeleteRec = onDeleteRecordingTapped {
+                            Button(role: .destructive, action: onDeleteRec) {
+                                Label("Delete Recording", systemImage: "waveform.slash")
+                            }
+                        }
                         Button(role: .destructive, action: onDeleteTapped) {
-                            Label("Delete", systemImage: "trash")
+                            Label("Delete Question", systemImage: "trash")
                         }
                     }
                 } label: {

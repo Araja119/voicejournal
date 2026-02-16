@@ -5,6 +5,9 @@ struct SettingsView: View {
     @Environment(\.colorScheme) var colorScheme
     @Environment(\.dismiss) var dismiss
     @State private var showingLogoutAlert = false
+    @State private var showingDeleteAccountAlert = false
+    @State private var showingFinalDeleteAlert = false
+    @State private var isDeletingAccount = false
 
     var body: some View {
         let colors = AppColors(colorScheme)
@@ -73,6 +76,16 @@ struct SettingsView: View {
                                     .foregroundColor(.red)
                             }
                         }
+
+                        Button(action: { showingDeleteAccountAlert = true }) {
+                            HStack {
+                                Image(systemName: "trash")
+                                    .foregroundColor(.red)
+                                Text("Delete Account")
+                                    .foregroundColor(.red)
+                            }
+                        }
+                        .disabled(isDeletingAccount)
                     }
                     .listRowBackground(colors.surface)
 
@@ -109,6 +122,30 @@ struct SettingsView: View {
                 }
             } message: {
                 Text("Are you sure you want to log out?")
+            }
+            .alert("Delete Account?", isPresented: $showingDeleteAccountAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Delete Account", role: .destructive) {
+                    showingFinalDeleteAlert = true
+                }
+            } message: {
+                Text("This will permanently delete your account and all data including journals, recordings, and people.")
+            }
+            .alert("Are you absolutely sure?", isPresented: $showingFinalDeleteAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Delete Everything", role: .destructive) {
+                    isDeletingAccount = true
+                    Task {
+                        do {
+                            try await appState.deleteAccount()
+                            dismiss()
+                        } catch {
+                            isDeletingAccount = false
+                        }
+                    }
+                }
+            } message: {
+                Text("This cannot be undone. All your journals, questions, voice recordings, and people will be permanently deleted.")
             }
         }
     }

@@ -253,9 +253,10 @@ struct EditPersonSheet: View {
 
                 // Upload photo if a new one was selected
                 if let imageData = selectedImageData {
+                    let compressed = ImageUtils.compressForUpload(imageData) ?? imageData
                     _ = try? await PeopleService.shared.uploadPhoto(
                         personId: person.id,
-                        imageData: imageData,
+                        imageData: compressed,
                         mimeType: "image/jpeg"
                     )
                 }

@@ -86,4 +86,14 @@ router.post(
   }
 );
 
+// DELETE /users/me - Delete account
+router.delete('/me', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await usersService.deleteAccount(req.user!.userId);
+    res.status(204).send();
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;

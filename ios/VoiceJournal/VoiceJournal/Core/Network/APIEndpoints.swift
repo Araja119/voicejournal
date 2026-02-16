@@ -28,6 +28,7 @@ enum APIEndpoint {
     case updateUser
     case uploadProfilePhoto
     case registerPushToken
+    case deleteAccount
 
     // Journals
     case journals
@@ -99,7 +100,7 @@ enum APIEndpoint {
         case .appleSignIn: return "/auth/apple"
 
         // Users
-        case .currentUser, .updateUser: return "/users/me"
+        case .currentUser, .updateUser, .deleteAccount: return "/users/me"
         case .uploadProfilePhoto: return "/users/me/profile-photo"
         case .registerPushToken: return "/users/me/push-token"
 
@@ -204,7 +205,7 @@ enum APIEndpoint {
 
         // DELETE
         case .deleteJournal, .removeCollaborator, .deletePerson, .deleteQuestion,
-             .deleteAssignment, .deleteRecording:
+             .deleteAssignment, .deleteRecording, .deleteAccount:
             return .delete
         }
     }

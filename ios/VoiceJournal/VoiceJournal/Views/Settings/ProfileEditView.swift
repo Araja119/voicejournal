@@ -134,8 +134,9 @@ struct ProfileEditView: View {
             do {
                 // Upload photo if selected
                 if let imageData = selectedImageData {
+                    let compressed = ImageUtils.compressForUpload(imageData) ?? imageData
                     let _ = try await AuthService.shared.uploadProfilePhoto(
-                        imageData: imageData,
+                        imageData: compressed,
                         mimeType: "image/jpeg"
                     )
                 }

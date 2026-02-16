@@ -110,6 +110,11 @@ class AuthService {
         )
     }
 
+    // MARK: - Delete Account
+    func deleteAccount() async throws {
+        try await client.requestNoContent(.deleteAccount)
+    }
+
     // MARK: - Register Push Token
     func registerPushToken(token: String, platform: String = "ios") async throws -> MessageResponse {
         let request = PushTokenRequest(token: token, platform: platform)
