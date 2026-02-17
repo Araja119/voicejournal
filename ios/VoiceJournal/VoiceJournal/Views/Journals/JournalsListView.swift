@@ -261,6 +261,7 @@ struct PersonJournalSection: View {
                 }
             }
             .buttonStyle(PlainButtonStyle())
+            .contentShape(Rectangle())
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
 
@@ -274,6 +275,7 @@ struct PersonJournalSection: View {
                             CompactJournalCard(journal: journal, colors: colors)
                         }
                         .buttonStyle(PlainButtonStyle())
+                        .contentShape(Rectangle())
                     }
                 }
                 .padding(.horizontal, 12)
@@ -348,6 +350,7 @@ struct GeneralJournalSection: View {
                 }
             }
             .buttonStyle(PlainButtonStyle())
+            .contentShape(Rectangle())
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
 
@@ -361,6 +364,7 @@ struct GeneralJournalSection: View {
                             CompactJournalCard(journal: journal, colors: colors)
                         }
                         .buttonStyle(PlainButtonStyle())
+                        .contentShape(Rectangle())
                     }
                 }
                 .padding(.horizontal, 12)
