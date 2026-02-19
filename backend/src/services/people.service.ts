@@ -1,6 +1,11 @@
 import prisma from '../utils/prisma.js';
 import { NotFoundError, ForbiddenError } from '../utils/errors.js';
-import { uploadPersonPhoto } from './storage.js';
+import { uploadPersonPhoto, getSignedUrl } from './storage.js';
+
+async function signPhotoUrl(url: string | null): Promise<string | null> {
+  if (!url) return null;
+  return getSignedUrl(url);
+}
 import type { CreatePersonInput, UpdatePersonInput } from '../validators/people.validators.js';
 
 export interface PersonSummary {
@@ -54,17 +59,17 @@ export async function listPeople(userId: string): Promise<PersonSummary[]> {
     orderBy: { createdAt: 'desc' },
   });
 
-  return people.map((person) => ({
+  return Promise.all(people.map(async (person) => ({
     id: person.id,
     name: person.name,
     relationship: person.relationship,
     email: person.email,
     phone_number: person.phoneNumber,
-    profile_photo_url: person.profilePhotoUrl,
+    profile_photo_url: await signPhotoUrl(person.profilePhotoUrl),
     total_recordings: person.recordings.length,
     pending_questions: person.assignments.length,
     created_at: person.createdAt,
-  }));
+  })));
 }
 
 export async function createPerson(userId: string, input: CreatePersonInput & { linked_user_id?: string }): Promise<PersonSummary> {
@@ -99,7 +104,7 @@ export async function createPerson(userId: string, input: CreatePersonInput & { 
     relationship: person.relationship,
     email: person.email,
     phone_number: person.phoneNumber,
-    profile_photo_url: person.profilePhotoUrl,
+    profile_photo_url: await signPhotoUrl(person.profilePhotoUrl),
     total_recordings: 0,
     pending_questions: 0,
     created_at: person.createdAt,
@@ -150,7 +155,7 @@ export async function getPerson(userId: string, personId: string): Promise<Perso
     relationship: person.relationship,
     email: person.email,
     phone_number: person.phoneNumber,
-    profile_photo_url: person.profilePhotoUrl,
+    profile_photo_url: await signPhotoUrl(person.profilePhotoUrl),
     total_recordings: person.recordings.length,
     pending_questions: person.assignments.length,
     created_at: person.createdAt,
@@ -220,7 +225,7 @@ export async function updatePerson(
     relationship: updated.relationship,
     email: updated.email,
     phone_number: updated.phoneNumber,
-    profile_photo_url: updated.profilePhotoUrl,
+    profile_photo_url: await signPhotoUrl(updated.profilePhotoUrl),
     total_recordings: updated.recordings.length,
     pending_questions: updated.assignments.length,
     created_at: updated.createdAt,
@@ -282,5 +287,5 @@ export async function updatePersonPhoto(
     data: { profilePhotoUrl: result.url },
   });
 
-  return { profile_photo_url: result.url };
+  return { profile_photo_url: await getSignedUrl(result.url) };
 }

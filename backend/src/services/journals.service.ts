@@ -1,7 +1,12 @@
 import { v4 as uuidv4 } from 'uuid';
 import prisma from '../utils/prisma.js';
 import { NotFoundError, ForbiddenError } from '../utils/errors.js';
-import { uploadJournalCover } from './storage.js';
+import { uploadJournalCover, getSignedUrl } from './storage.js';
+
+async function signPhotoUrl(url: string | null): Promise<string | null> {
+  if (!url) return null;
+  return getSignedUrl(url);
+}
 import type {
   CreateJournalInput,
   UpdateJournalInput,
@@ -117,7 +122,7 @@ export async function listJournals(userId: string, query: JournalQueryInput): Pr
     orderBy: { updatedAt: 'desc' },
   });
 
-  return journals.map((journal) => {
+  return Promise.all(journals.map(async (journal) => {
     const answeredCount = journal.questions.reduce((count, q) => {
       return count + q.assignments.filter((a) => a.status === 'answered').length;
     }, 0);
@@ -143,7 +148,7 @@ export async function listJournals(userId: string, query: JournalQueryInput): Pr
         id: journal.dedicatedToPerson.id,
         name: journal.dedicatedToPerson.name,
         relationship: journal.dedicatedToPerson.relationship,
-        profile_photo_url: journal.dedicatedToPerson.profilePhotoUrl,
+        profile_photo_url: await signPhotoUrl(journal.dedicatedToPerson.profilePhotoUrl),
         linked_user_id: journal.dedicatedToPerson.linkedUserId,
       } : null,
       is_owner: journal.ownerId === userId,
@@ -152,7 +157,7 @@ export async function listJournals(userId: string, query: JournalQueryInput): Pr
       person_count: uniquePersonIds.size,
       created_at: journal.createdAt,
     };
-  });
+  }));
 }
 
 export async function createJournal(userId: string, input: CreateJournalInput): Promise<JournalDetail> {
@@ -190,7 +195,7 @@ export async function createJournal(userId: string, input: CreateJournalInput): 
       id: journal.dedicatedToPerson.id,
       name: journal.dedicatedToPerson.name,
       relationship: journal.dedicatedToPerson.relationship,
-      profile_photo_url: journal.dedicatedToPerson.profilePhotoUrl,
+      profile_photo_url: await signPhotoUrl(journal.dedicatedToPerson.profilePhotoUrl),
       linked_user_id: journal.dedicatedToPerson.linkedUserId,
     } : null,
     is_owner: true,
@@ -240,20 +245,28 @@ export async function getJournal(userId: string, journalId: string): Promise<Jou
 
   const appUrl = process.env.WEB_APP_URL || 'http://localhost:3000';
 
-  // Get unique people
+  // Get unique people (with signed photo URLs)
   const peopleMap = new Map<string, { id: string; name: string; relationship: string; profile_photo_url: string | null }>();
+  const photoSignPromises: Promise<void>[] = [];
   journal.questions.forEach((q) => {
     q.assignments.forEach((a) => {
       if (!peopleMap.has(a.person.id)) {
-        peopleMap.set(a.person.id, {
+        const personEntry = {
           id: a.person.id,
           name: a.person.name,
           relationship: a.person.relationship,
-          profile_photo_url: a.person.profilePhotoUrl,
-        });
+          profile_photo_url: a.person.profilePhotoUrl as string | null,
+        };
+        peopleMap.set(a.person.id, personEntry);
+        photoSignPromises.push(
+          signPhotoUrl(a.person.profilePhotoUrl).then((signed) => {
+            personEntry.profile_photo_url = signed;
+          })
+        );
       }
     });
   });
+  await Promise.all(photoSignPromises);
 
   const answeredCount = journal.questions.reduce((count, q) => {
     return count + q.assignments.filter((a) => a.status === 'answered').length;
@@ -275,7 +288,7 @@ export async function getJournal(userId: string, journalId: string): Promise<Jou
       id: journal.dedicatedToPerson.id,
       name: journal.dedicatedToPerson.name,
       relationship: journal.dedicatedToPerson.relationship,
-      profile_photo_url: journal.dedicatedToPerson.profilePhotoUrl,
+      profile_photo_url: await signPhotoUrl(journal.dedicatedToPerson.profilePhotoUrl),
       linked_user_id: journal.dedicatedToPerson.linkedUserId,
     } : null,
     is_owner: isOwner,
@@ -292,7 +305,7 @@ export async function getJournal(userId: string, journalId: string): Promise<Jou
         id: a.id,
         person_id: a.personId,
         person_name: a.person.name,
-        person_profile_photo_url: a.person.profilePhotoUrl,
+        person_profile_photo_url: peopleMap.get(a.person.id)?.profile_photo_url ?? null,
         status: a.status,
         unique_link_token: a.uniqueLinkToken,
         recording_link: `${appUrl}/record/${a.uniqueLinkToken}`,

@@ -1,6 +1,11 @@
 import prisma from '../utils/prisma.js';
 import { NotFoundError } from '../utils/errors.js';
-import { uploadProfilePhoto } from './storage.js';
+import { uploadProfilePhoto, getSignedUrl } from './storage.js';
+
+async function signPhotoUrl(url: string | null): Promise<string | null> {
+  if (!url) return null;
+  return getSignedUrl(url);
+}
 import type { UpdateUserInput, PushTokenInput } from '../validators/users.validators.js';
 
 /**
@@ -88,7 +93,7 @@ export async function getProfile(userId: string): Promise<UserProfile> {
     email: user.email,
     display_name: user.displayName,
     phone_number: user.phoneNumber,
-    profile_photo_url: user.profilePhotoUrl,
+    profile_photo_url: await signPhotoUrl(user.profilePhotoUrl),
     subscription_tier: user.subscriptionTier,
     created_at: user.createdAt,
   };
@@ -116,7 +121,7 @@ export async function updateProfile(userId: string, input: UpdateUserInput): Pro
     email: user.email,
     display_name: user.displayName,
     phone_number: user.phoneNumber,
-    profile_photo_url: user.profilePhotoUrl,
+    profile_photo_url: await signPhotoUrl(user.profilePhotoUrl),
     subscription_tier: user.subscriptionTier,
     created_at: user.createdAt,
   };
@@ -141,7 +146,7 @@ export async function updateProfilePhoto(
     data: { profilePhotoUrl: result.url },
   });
 
-  return { profile_photo_url: result.url };
+  return { profile_photo_url: await getSignedUrl(result.url) };
 }
 
 export async function registerPushToken(userId: string, input: PushTokenInput): Promise<void> {
