@@ -255,6 +255,7 @@
 				DEVELOPMENT_TEAM = H37C99WMSJ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSContactsUsageDescription = "VoiceJournal can import names and contact info from your contacts to easily add people.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "VoiceJournal needs microphone access to record your audio responses.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -289,6 +290,7 @@
 				DEVELOPMENT_TEAM = H37C99WMSJ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSContactsUsageDescription = "VoiceJournal can import names and contact info from your contacts to easily add people.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "VoiceJournal needs microphone access to record your audio responses.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;

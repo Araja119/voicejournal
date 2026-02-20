@@ -64,6 +64,7 @@ enum SendChannel: String, Codable {
     case sms = "sms"
     case email = "email"
     case push = "push"
+    case share = "share"
 }
 
 // MARK: - Send Assignment Response

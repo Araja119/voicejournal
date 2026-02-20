@@ -78,9 +78,11 @@ voicejournal/
 │       ├── Components/
 │       │   ├── AppBackground.swift    # Gradient vignette over image
 │       │   ├── AvatarView.swift
+│       │   ├── ContactPicker.swift    # CNContactPickerViewController wrapper
 │       │   ├── EmptyStateView.swift
 │       │   ├── GlassView.swift        # Frosted glass card modifiers
-│       │   └── LoadingView.swift
+│       │   ├── LoadingView.swift
+│       │   └── ShareSheet.swift       # SharePresenter via UIKit UIActivityViewController
 │       ├── Auth/
 │       │   ├── LoginView.swift
 │       │   └── SignupView.swift
@@ -161,10 +163,13 @@ voicejournal/
 - Create questions manually or use AI-suggested questions
 - AI suggestions powered by Claude API (personalized based on journal context)
 - Edit and delete draft questions via action sheet
-- Send questions to recipients via email with recording link
+- Send questions via native iOS share sheet (iMessage, AirDrop, WhatsApp, etc.) — not email
+- Share sheet presents recording link + formatted message via `SharePresenter` (UIKit direct presentation)
 
 ### 4. People
 - Add family members/friends as "People"
+- **Import from Contacts**: Auto-fills name, email, phone, and profile photo from phone contacts
+- **Relationship picker**: Must explicitly select a relationship (no default); validated on save
 - **"Myself" card** always appears at top of People list
 - Associate people with journals
 - Track their response status
@@ -481,6 +486,16 @@ For child views with action menus (like QuestionTimelineCard):
 - [x] Profile photo/name changes sync to Myself card immediately via `refreshSyntheticMyself`
 - [x] Send question fix: re-entry guard prevents duplicate questions, graceful handling when person has no email
 - [x] ProfileEditView Cancel button added for sheet dismissal
+- [x] Share sheet via native iOS UIActivityViewController (replaces email send)
+- [x] SharePresenter: UIKit direct presentation for proper iMessage/AirDrop/Mail suggestions
+- [x] Backend "share" channel (no-op delivery, marks assignment as sent)
+- [x] Contacts import in AddPersonSheet and QuickAddPersonSheet (name, email, phone, photo)
+- [x] ContactPicker component wrapping CNContactPickerViewController with CNContactStore re-fetch
+- [x] Contacts authorization requested before showing picker (photo extraction requires explicit access)
+- [x] Relationship picker validation (must select, no default; red highlight on save if empty)
+- [x] Signed URLs for profile photos in production R2 (people, journals, users services)
+- [x] NSContactsUsageDescription added via INFOPLIST_KEY build setting (GENERATE_INFOPLIST_FILE=YES)
+- [x] Delete person confirmation shows as bottom action sheet (single-step confirmationDialog)
 
 ### TODO - Feature Completion
 - [x] "Send to [Name]" in timeline — wired to QuestionService.sendAssignment
@@ -490,6 +505,7 @@ For child views with action menus (like QuestionTimelineCard):
 - [x] **Delete recording from timeline** — Menu option with confirmation dialog, refreshes journal after deletion
 - [x] **Account deletion** — DELETE `/users/me` endpoint + Settings UI with two-step confirmation
 - [x] **Image compression** — `ImageUtils.compressForUpload()` helper, applied to all 4 upload sites
+- [ ] **Edit journal thumbnail** — Allow users to pick/change a cover image for a journal (photo library or camera)
 - [ ] **Push notifications** — Backend push token endpoint exists, iOS implementation missing (Firebase FCM)
 - [ ] **Search** — No search in journals, people, or recordings lists
 

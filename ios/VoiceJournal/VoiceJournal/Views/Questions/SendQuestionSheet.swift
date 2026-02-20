@@ -17,6 +17,9 @@ struct SendQuestionSheet: View {
     @State private var step: SendQuestionStep = .selectPerson
     @State private var showingAddPerson = false
 
+    // Share sheet state
+    @State private var pendingShareAssignmentId: String?
+
     enum SendQuestionStep {
         case selectPerson
         case selectJournal
@@ -412,22 +415,58 @@ struct SendQuestionSheet: View {
                     request
                 )
 
-                // Try to send the assignment via email if person has an email
-                // For self-persons or people without email, question is saved as draft
+                // For non-self persons, present share sheet with recording link
                 if let assignment = question.assignments?.first,
-                   !person.isSelf,
-                   let email = person.email, !email.isEmpty {
-                    _ = try? await QuestionService.shared.sendAssignment(
-                        assignmentId: assignment.id,
-                        channel: .email
-                    )
+                   !person.isSelf {
+                    let link = assignment.recordingLink ?? assignment.uniqueLinkToken.map { token in
+                        APIConfig.baseURL.replacingOccurrences(of: "/v1", with: "") + "/record/" + token
+                    }
+
+                    if let recordingLink = link {
+                        let senderName = journal.owner.displayName
+                        let shareText = "\(senderName) has a question for you:\n\n\"\(questionText)\"\n\nTap to record your answer:\n\(recordingLink)"
+                        let assignmentId = assignment.id
+
+                        await MainActor.run {
+                            pendingShareAssignmentId = assignmentId
+                            isSending = false
+                            SharePresenter.present(items: [shareText]) { completed in
+                                handleShareCompletion(completed: completed)
+                            }
+                        }
+                        return
+                    }
                 }
 
+                // Fallback: dismiss without share (self-journals or missing link)
                 dismiss()
             } catch {
                 self.error = "Failed to create question"
             }
             isSending = false
+        }
+    }
+
+    private func handleShareCompletion(completed: Bool) {
+        guard completed, let assignmentId = pendingShareAssignmentId else {
+            pendingShareAssignmentId = nil
+            // Still dismiss — question was created even if user didn't share
+            dismiss()
+            return
+        }
+
+        Task {
+            do {
+                _ = try await QuestionService.shared.sendAssignment(
+                    assignmentId: assignmentId, channel: .share
+                )
+            } catch {
+                // Question was created, share sheet was used — don't block dismissal
+            }
+            pendingShareAssignmentId = nil
+            await MainActor.run {
+                dismiss()
+            }
         }
     }
 }

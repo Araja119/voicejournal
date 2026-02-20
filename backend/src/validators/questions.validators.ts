@@ -39,7 +39,7 @@ export const assignQuestionSchema = z.object({
 });
 
 export const sendAssignmentSchema = z.object({
-  channel: z.enum(['sms', 'email']),
+  channel: z.enum(['sms', 'email', 'share']),
 });
 
 export const assignmentIdSchema = z.object({

@@ -47,6 +47,9 @@ struct JournalDetailView: View {
     @State private var sendingQuestionId: String?
     @State private var sendError: String?
 
+    // Share sheet state
+    @State private var pendingShareAssignmentId: String?
+
     // Recording deletion state
     @State private var recordingToDelete: String? // recording ID
     @State private var showingDeleteRecordingConfirmation = false
@@ -425,7 +428,7 @@ struct JournalDetailView: View {
             do {
                 let _ = try await QuestionService.shared.sendReminder(
                     assignmentId: assignment.id,
-                    channel: .email
+                    channel: .share
                 )
 
                 // Record in cap tracker
@@ -460,44 +463,87 @@ struct JournalDetailView: View {
         Task {
             do {
                 // Step 1: Assign if no assignment exists for this person
-                var assignmentId: String
+                var assignment: Assignment
                 if let existing = question.assignments?.first(where: { $0.personId == person.id }) {
-                    assignmentId = existing.id
+                    assignment = existing
                 } else {
                     let response = try await QuestionService.shared.assignQuestion(
                         questionId: question.id, personIds: [person.id]
                     )
-                    assignmentId = response.assignments.first!.id
+                    assignment = response.assignments.first!
                 }
 
-                // Step 2: Send the assignment via email
-                _ = try await QuestionService.shared.sendAssignment(
-                    assignmentId: assignmentId, channel: .email
-                )
+                // Step 2: Get recording link
+                let link = assignment.recordingLink ?? assignment.uniqueLinkToken.map { token in
+                    APIConfig.baseURL.replacingOccurrences(of: "/v1", with: "") + "/record/" + token
+                }
 
-                // Step 3: Reload journal to reflect new state
-                await viewModel.loadJournal(id: journalId)
+                guard let recordingLink = link else {
+                    sendError = "Could not generate recording link."
+                    sendingQuestionId = nil
+                    return
+                }
+
+                // Step 3: Build share text and present share sheet
+                let senderName = journal.owner.displayName
+                let shareText = "\(senderName) has a question for you:\n\n\"\(question.questionText)\"\n\nTap to record your answer:\n\(recordingLink)"
+                let assignmentId = assignment.id
+
+                await MainActor.run {
+                    pendingShareAssignmentId = assignmentId
+                    sendingQuestionId = nil
+                    SharePresenter.present(items: [shareText]) { completed in
+                        handleShareCompletion(completed: completed)
+                    }
+                }
             } catch {
                 sendError = "Failed to send question. Try again."
+                sendingQuestionId = nil
             }
-            sendingQuestionId = nil
         }
     }
 
     private func resendQuestion(for question: Question) {
+        guard let journal = viewModel.journal else { return }
+
         if let assignment = question.assignments?.first(where: {
             $0.status == .sent || $0.status == .viewed
         }) {
-            Task {
-                do {
-                    _ = try await QuestionService.shared.sendAssignment(
-                        assignmentId: assignment.id, channel: .email
-                    )
-                    await viewModel.loadJournal(id: journalId)
-                } catch {
-                    sendError = "Failed to resend. Try again."
-                }
+            let link = assignment.recordingLink ?? assignment.uniqueLinkToken.map { token in
+                APIConfig.baseURL.replacingOccurrences(of: "/v1", with: "") + "/record/" + token
             }
+
+            guard let recordingLink = link else {
+                sendError = "Could not generate recording link."
+                return
+            }
+
+            let senderName = journal.owner.displayName
+            let shareText = "\(senderName) has a question for you:\n\n\"\(question.questionText)\"\n\nTap to record your answer:\n\(recordingLink)"
+
+            pendingShareAssignmentId = assignment.id
+            SharePresenter.present(items: [shareText]) { completed in
+                handleShareCompletion(completed: completed)
+            }
+        }
+    }
+
+    private func handleShareCompletion(completed: Bool) {
+        guard completed, let assignmentId = pendingShareAssignmentId else {
+            pendingShareAssignmentId = nil
+            return
+        }
+
+        Task {
+            do {
+                _ = try await QuestionService.shared.sendAssignment(
+                    assignmentId: assignmentId, channel: .share
+                )
+                await viewModel.loadJournal(id: journalId)
+            } catch {
+                sendError = "Failed to mark as sent."
+            }
+            pendingShareAssignmentId = nil
         }
     }
 

@@ -37,7 +37,9 @@ export async function sendAssignment(
   const appUrl = process.env.WEB_APP_URL || 'http://localhost:3000';
   const recordingUrl = `${appUrl}/record/${assignment.uniqueLinkToken}`;
 
-  if (input.channel === 'sms') {
+  if (input.channel === 'share') {
+    // User shared via native share sheet — no delivery needed, just mark as sent
+  } else if (input.channel === 'sms') {
     if (!person.phoneNumber) {
       throw new ValidationError('Person does not have a phone number');
     }
@@ -149,7 +151,9 @@ export async function sendReminder(
   const appUrl = process.env.WEB_APP_URL || 'http://localhost:3000';
   const recordingUrl = `${appUrl}/record/${assignment.uniqueLinkToken}`;
 
-  if (input.channel === 'sms') {
+  if (input.channel === 'share') {
+    // User reminded via native share sheet — no delivery needed
+  } else if (input.channel === 'sms') {
     if (!person.phoneNumber) {
       throw new ValidationError('Person does not have a phone number');
     }

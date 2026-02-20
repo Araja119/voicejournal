@@ -53,6 +53,8 @@
     <string>VoiceJournal needs access to your photo library to add profile photos and journal covers.</string>
     <key>NSCameraUsageDescription</key>
     <string>VoiceJournal needs camera access to take photos for your profile and journals.</string>
+    <key>NSContactsUsageDescription</key>
+    <string>VoiceJournal can import names and contact info from your contacts to easily add people.</string>
 
     <!-- App Transport Security -->
     <key>NSAppTransportSecurity</key>
