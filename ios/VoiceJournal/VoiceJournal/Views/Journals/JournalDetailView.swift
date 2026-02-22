@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 
 struct JournalDetailView: View {
     let journalId: String
@@ -193,9 +194,11 @@ struct JournalDetailView: View {
             EditJournalSheet(
                 title: $editedJournalTitle,
                 description: $editedJournalDescription,
+                journalId: journalId,
+                currentCoverUrl: viewModel.journal?.coverImageUrl,
                 isSaving: isSavingJournal,
-                onSave: {
-                    saveEditedJournal()
+                onSave: { imageData in
+                    saveEditedJournal(coverImageData: imageData)
                 },
                 onCancel: {
                     showingEditJournal = false
@@ -352,7 +355,7 @@ struct JournalDetailView: View {
         }
     }
 
-    private func saveEditedJournal() {
+    private func saveEditedJournal(coverImageData: Data? = nil) {
         let trimmedTitle = editedJournalTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedTitle.isEmpty else { return }
 
@@ -365,6 +368,17 @@ struct JournalDetailView: View {
                     description: editedJournalDescription.isEmpty ? nil : editedJournalDescription
                 )
                 _ = try await JournalService.shared.updateJournal(id: journalId, request)
+
+                // Upload cover image if selected
+                if let imageData = coverImageData {
+                    let compressed = ImageUtils.compressForUpload(imageData) ?? imageData
+                    _ = try await JournalService.shared.uploadCoverImage(
+                        journalId: journalId,
+                        imageData: compressed,
+                        mimeType: "image/jpeg"
+                    )
+                }
+
                 await viewModel.loadJournal(id: journalId)
             } catch {
                 print("Failed to update journal: \(error)")
@@ -1574,12 +1588,16 @@ struct EditQuestionSheet: View {
 struct EditJournalSheet: View {
     @Binding var title: String
     @Binding var description: String
+    let journalId: String
+    let currentCoverUrl: String?
     let isSaving: Bool
-    let onSave: () -> Void
+    let onSave: (Data?) -> Void
     let onCancel: () -> Void
 
     @Environment(\.colorScheme) var colorScheme
     @FocusState private var focusedField: Field?
+    @State private var selectedPhoto: PhotosPickerItem?
+    @State private var selectedImageData: Data?
 
     enum Field {
         case title, description
@@ -1592,42 +1610,96 @@ struct EditJournalSheet: View {
             ZStack {
                 colors.background.ignoresSafeArea()
 
-                VStack(spacing: Theme.Spacing.lg) {
-                    // Title field
-                    VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                        Text("Title")
-                            .font(AppTypography.labelMedium)
-                            .foregroundColor(colors.textSecondary)
+                ScrollView {
+                    VStack(spacing: Theme.Spacing.lg) {
+                        // Cover image section — compact circle
+                        VStack(spacing: Theme.Spacing.sm) {
+                            PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                                ZStack(alignment: .bottomTrailing) {
+                                    if let imageData = selectedImageData,
+                                       let uiImage = UIImage(data: imageData) {
+                                        Image(uiImage: uiImage)
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fill)
+                                            .frame(width: 80, height: 80)
+                                            .clipShape(Circle())
+                                    } else if let coverUrl = currentCoverUrl, let url = URL(string: coverUrl) {
+                                        AsyncImage(url: url) { phase in
+                                            switch phase {
+                                            case .success(let image):
+                                                image
+                                                    .resizable()
+                                                    .aspectRatio(contentMode: .fill)
+                                                    .frame(width: 80, height: 80)
+                                                    .clipShape(Circle())
+                                            default:
+                                                coverPlaceholder(colors: colors)
+                                            }
+                                        }
+                                    } else {
+                                        coverPlaceholder(colors: colors)
+                                    }
 
-                        TextField("Journal title", text: $title)
-                            .font(AppTypography.bodyLarge)
-                            .foregroundColor(colors.textPrimary)
-                            .padding(Theme.Spacing.md)
-                            .background(colors.surface)
-                            .cornerRadius(Theme.Radius.md)
-                            .focused($focusedField, equals: .title)
+                                    // Camera badge
+                                    Circle()
+                                        .fill(colors.accentPrimary)
+                                        .frame(width: 26, height: 26)
+                                        .overlay(
+                                            Image(systemName: "camera.fill")
+                                                .font(.system(size: 12))
+                                                .foregroundColor(.white)
+                                        )
+                                        .offset(x: 2, y: 2)
+                                }
+                            }
+                            .onChange(of: selectedPhoto) { _, newValue in
+                                Task {
+                                    if let data = try? await newValue?.loadTransferable(type: Data.self) {
+                                        selectedImageData = data
+                                    }
+                                }
+                            }
+
+                            Text("Journal Icon")
+                                .font(AppTypography.caption)
+                                .foregroundColor(colors.textSecondary)
+                        }
+                        .frame(maxWidth: .infinity)
+
+                        // Title field
+                        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                            Text("Title")
+                                .font(AppTypography.labelMedium)
+                                .foregroundColor(colors.textSecondary)
+
+                            TextField("Journal title", text: $title)
+                                .font(AppTypography.bodyLarge)
+                                .foregroundColor(colors.textPrimary)
+                                .padding(Theme.Spacing.md)
+                                .background(colors.surface)
+                                .cornerRadius(Theme.Radius.md)
+                                .focused($focusedField, equals: .title)
+                        }
+
+                        // Description field
+                        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                            Text("Description (optional)")
+                                .font(AppTypography.labelMedium)
+                                .foregroundColor(colors.textSecondary)
+
+                            TextEditor(text: $description)
+                                .font(AppTypography.bodyMedium)
+                                .foregroundColor(colors.textPrimary)
+                                .scrollContentBackground(.hidden)
+                                .padding(Theme.Spacing.md)
+                                .background(colors.surface)
+                                .cornerRadius(Theme.Radius.md)
+                                .frame(minHeight: 100)
+                                .focused($focusedField, equals: .description)
+                        }
                     }
-
-                    // Description field
-                    VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                        Text("Description (optional)")
-                            .font(AppTypography.labelMedium)
-                            .foregroundColor(colors.textSecondary)
-
-                        TextEditor(text: $description)
-                            .font(AppTypography.bodyMedium)
-                            .foregroundColor(colors.textPrimary)
-                            .scrollContentBackground(.hidden)
-                            .padding(Theme.Spacing.md)
-                            .background(colors.surface)
-                            .cornerRadius(Theme.Radius.md)
-                            .frame(minHeight: 100)
-                            .focused($focusedField, equals: .description)
-                    }
-
-                    Spacer()
+                    .padding(Theme.Spacing.lg)
                 }
-                .padding(Theme.Spacing.lg)
             }
             .navigationTitle("Edit Journal")
             .navigationBarTitleDisplayMode(.inline)
@@ -1645,7 +1717,7 @@ struct EditJournalSheet: View {
                         ProgressView()
                     } else {
                         Button("Save") {
-                            onSave()
+                            onSave(selectedImageData)
                         }
                         .fontWeight(.semibold)
                         .foregroundColor(colors.accentPrimary)
@@ -1657,6 +1729,18 @@ struct EditJournalSheet: View {
                 focusedField = .title
             }
         }
+    }
+
+    @ViewBuilder
+    private func coverPlaceholder(colors: AppColors) -> some View {
+        Circle()
+            .fill(colors.surface)
+            .frame(width: 80, height: 80)
+            .overlay(
+                Image(systemName: "book.closed.fill")
+                    .font(.system(size: 28))
+                    .foregroundColor(colors.textSecondary.opacity(0.4))
+            )
     }
 }
 

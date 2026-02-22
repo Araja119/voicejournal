@@ -411,7 +411,7 @@ struct CompactJournalCard: View {
         let textColors = GlassTextColors(colorScheme: colorScheme)
 
         HStack(spacing: 12) {
-            // Cover placeholder
+            // Cover icon
             Group {
                 if let coverUrl = journal.coverImageUrl, let url = URL(string: coverUrl) {
                     AsyncImage(url: url) { phase in
@@ -429,7 +429,7 @@ struct CompactJournalCard: View {
                 }
             }
             .frame(width: 40, height: 40)
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .clipShape(Circle())
 
             // Info
             VStack(alignment: .leading, spacing: 2) {
@@ -457,24 +457,20 @@ struct CompactJournalCard: View {
         .contentShape(Rectangle())
     }
 
-    // Journal tile icon - solid object that sits ON the glass, not faded into it
+    // Journal icon - circular to match edit sheet
     private var coverPlaceholder: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
+            Circle()
                 .fill(colorScheme == .dark
                     ? Color.white.opacity(0.08)
-                    : Color.black.opacity(0.06))  // Dark fill creates contrast on light glass
+                    : Color.black.opacity(0.06))
 
-            Image(systemName: "book.closed.fill")  // Filled icon, not outline
+            Image(systemName: "book.closed.fill")
                 .font(.system(size: 16, weight: .medium))
                 .foregroundColor(colorScheme == .dark
                     ? .white.opacity(0.35)
-                    : .black.opacity(0.55))  // Strong ink, not faded
+                    : .black.opacity(0.55))
         }
-        .shadow(color: colorScheme == .dark
-            ? .black.opacity(0.15)
-            : .black.opacity(0.08),
-            radius: 4, x: 0, y: 2)  // Micro shadow - tile sits ON glass
     }
 }
 

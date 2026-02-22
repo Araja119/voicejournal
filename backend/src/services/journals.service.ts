@@ -138,7 +138,7 @@ export async function listJournals(userId: string, query: JournalQueryInput): Pr
       id: journal.id,
       title: journal.title,
       description: journal.description,
-      cover_image_url: journal.coverImageUrl,
+      cover_image_url: await signPhotoUrl(journal.coverImageUrl),
       privacy_setting: journal.privacySetting,
       owner: {
         id: journal.owner.id,
@@ -400,7 +400,7 @@ export async function updateCoverImage(
     data: { coverImageUrl: result.url },
   });
 
-  return { cover_image_url: result.url };
+  return { cover_image_url: await getSignedUrl(result.url) };
 }
 
 export async function listCollaborators(userId: string, journalId: string) {
