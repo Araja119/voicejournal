@@ -272,8 +272,17 @@ struct PersonJournalSection: View {
 
             // Journals nested under person
             if !isCollapsed {
-                VStack(spacing: 4) {
-                    ForEach(section.journals, id: \.id) { journal in
+                VStack(spacing: 0) {
+                    ForEach(Array(section.journals.enumerated()), id: \.element.id) { index, journal in
+                        if index > 0 {
+                            // Ultra-subtle divider between rows
+                            Rectangle()
+                                .fill(colorScheme == .dark
+                                    ? Color.white.opacity(0.06)
+                                    : Color.black.opacity(0.06))
+                                .frame(height: 0.5)
+                                .padding(.leading, 48) // Align with text, past icon
+                        }
                         NavigationLink {
                             JournalDetailView(journalId: journal.id, onDelete: onDelete)
                         } label: {
@@ -286,12 +295,13 @@ struct PersonJournalSection: View {
                 .padding(.vertical, 6)
                 .padding(.horizontal, 12)
                 .background(
-                    RoundedRectangle(cornerRadius: 16)
+                    RoundedRectangle(cornerRadius: 14)
                         .fill(colorScheme == .dark
-                            ? Color.white.opacity(0.04)
-                            : Color.black.opacity(0.03))
+                            ? Color.white.opacity(0.025)
+                            : Color.black.opacity(0.025))
                 )
                 .padding(.horizontal, 8)
+                .padding(.top, 4)  // Breathing room: header → panel
                 .padding(.bottom, 10)
             }
         }
@@ -368,8 +378,16 @@ struct GeneralJournalSection: View {
 
             // Journals nested under General
             if !isCollapsed {
-                VStack(spacing: 4) {
-                    ForEach(journals, id: \.id) { journal in
+                VStack(spacing: 0) {
+                    ForEach(Array(journals.enumerated()), id: \.element.id) { index, journal in
+                        if index > 0 {
+                            Rectangle()
+                                .fill(colorScheme == .dark
+                                    ? Color.white.opacity(0.06)
+                                    : Color.black.opacity(0.06))
+                                .frame(height: 0.5)
+                                .padding(.leading, 48)
+                        }
                         NavigationLink {
                             JournalDetailView(journalId: journal.id, onDelete: onDelete)
                         } label: {
@@ -382,12 +400,13 @@ struct GeneralJournalSection: View {
                 .padding(.vertical, 6)
                 .padding(.horizontal, 12)
                 .background(
-                    RoundedRectangle(cornerRadius: 16)
+                    RoundedRectangle(cornerRadius: 14)
                         .fill(colorScheme == .dark
-                            ? Color.white.opacity(0.04)
-                            : Color.black.opacity(0.03))
+                            ? Color.white.opacity(0.025)
+                            : Color.black.opacity(0.025))
                 )
                 .padding(.horizontal, 8)
+                .padding(.top, 4)
                 .padding(.bottom, 10)
             }
         }
@@ -476,19 +495,19 @@ struct CompactJournalCard: View {
         .contentShape(Rectangle())
     }
 
-    // Journal icon — smaller circle placeholder
+    // Journal icon — warm-tinted placeholder
     private var coverPlaceholder: some View {
         ZStack {
             Circle()
                 .fill(colorScheme == .dark
-                    ? Color.white.opacity(0.07)
-                    : Color.black.opacity(0.05))
+                    ? Color(red: 1, green: 0.6, blue: 0.3).opacity(0.12)
+                    : Color(red: 1, green: 0.5, blue: 0.2).opacity(0.10))
 
             Image(systemName: "book.closed.fill")
                 .font(.system(size: 13, weight: .medium))
                 .foregroundColor(colorScheme == .dark
-                    ? .white.opacity(0.3)
-                    : .black.opacity(0.4))
+                    ? Color(red: 1, green: 0.7, blue: 0.4).opacity(0.6)
+                    : Color(red: 0.8, green: 0.4, blue: 0.1).opacity(0.55))
         }
     }
 }
