@@ -496,6 +496,11 @@ For child views with action menus (like QuestionTimelineCard):
 - [x] Signed URLs for profile photos in production R2 (people, journals, users services)
 - [x] NSContactsUsageDescription added via INFOPLIST_KEY build setting (GENERATE_INFOPLIST_FILE=YES)
 - [x] Delete person confirmation shows as bottom action sheet (single-step confirmationDialog)
+- [x] Journal cover image editing via PhotosPicker (circular 80pt preview with camera badge)
+- [x] Signed URLs for cover_image_url in production R2 (journals.service.ts)
+- [x] Circular journal thumbnails in journals list (32pt, matches edit sheet)
+- [x] Journal list visual hierarchy: subtle inner panel, 0.5pt dividers, warm-tinted default icon
+- [x] Journals sorted by creation date within person sections (oldest first)
 
 ### TODO - Feature Completion
 - [x] "Send to [Name]" in timeline — wired to QuestionService.sendAssignment
@@ -505,7 +510,7 @@ For child views with action menus (like QuestionTimelineCard):
 - [x] **Delete recording from timeline** — Menu option with confirmation dialog, refreshes journal after deletion
 - [x] **Account deletion** — DELETE `/users/me` endpoint + Settings UI with two-step confirmation
 - [x] **Image compression** — `ImageUtils.compressForUpload()` helper, applied to all 4 upload sites
-- [ ] **Edit journal thumbnail** — Allow users to pick/change a cover image for a journal (photo library or camera)
+- [x] **Edit journal thumbnail** — PhotosPicker in EditJournalSheet, circular icon, backend signed URLs
 - [ ] **Push notifications** — Backend push token endpoint exists, iOS implementation missing (Firebase FCM)
 - [ ] **Search** — No search in journals, people, or recordings lists
 
