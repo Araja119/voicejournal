@@ -116,11 +116,16 @@ struct JournalsListView: View {
                 grouped[person.id, default: []].append(journal)
             }
         }
+        // Sort each group by creation date (oldest first)
+        for (key, journals) in grouped {
+            grouped[key] = journals.sorted { $0.createdAt < $1.createdAt }
+        }
         return grouped
     }
 
     private var generalJournals: [Journal] {
         viewModel.journals.filter { $0.dedicatedToPerson == nil }
+            .sorted { $0.createdAt < $1.createdAt }
     }
 
     private var allPersonSections: [JournalSection] {
@@ -265,9 +270,9 @@ struct PersonJournalSection: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
 
-            // Journals inside the same container - NO dividers, spacing creates separation
+            // Journals nested under person
             if !isCollapsed {
-                VStack(spacing: 4) {  // Spacing instead of divider lines
+                VStack(spacing: 4) {
                     ForEach(section.journals, id: \.id) { journal in
                         NavigationLink {
                             JournalDetailView(journalId: journal.id, onDelete: onDelete)
@@ -278,8 +283,15 @@ struct PersonJournalSection: View {
                         .contentShape(Rectangle())
                     }
                 }
+                .padding(.vertical, 6)
                 .padding(.horizontal, 12)
-                .padding(.top, 4)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(colorScheme == .dark
+                            ? Color.white.opacity(0.04)
+                            : Color.black.opacity(0.03))
+                )
+                .padding(.horizontal, 8)
                 .padding(.bottom, 10)
             }
         }
@@ -354,9 +366,9 @@ struct GeneralJournalSection: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
 
-            // Journals inside container - NO dividers, spacing creates separation
+            // Journals nested under General
             if !isCollapsed {
-                VStack(spacing: 4) {  // Spacing instead of divider lines
+                VStack(spacing: 4) {
                     ForEach(journals, id: \.id) { journal in
                         NavigationLink {
                             JournalDetailView(journalId: journal.id, onDelete: onDelete)
@@ -367,8 +379,15 @@ struct GeneralJournalSection: View {
                         .contentShape(Rectangle())
                     }
                 }
+                .padding(.vertical, 6)
                 .padding(.horizontal, 12)
-                .padding(.top, 4)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(colorScheme == .dark
+                            ? Color.white.opacity(0.04)
+                            : Color.black.opacity(0.03))
+                )
+                .padding(.horizontal, 8)
                 .padding(.bottom, 10)
             }
         }
@@ -410,8 +429,8 @@ struct CompactJournalCard: View {
     var body: some View {
         let textColors = GlassTextColors(colorScheme: colorScheme)
 
-        HStack(spacing: 12) {
-            // Cover icon
+        HStack(spacing: 10) {
+            // Cover icon — smaller than person avatar (32 vs 44)
             Group {
                 if let coverUrl = journal.coverImageUrl, let url = URL(string: coverUrl) {
                     AsyncImage(url: url) { phase in
@@ -428,19 +447,19 @@ struct CompactJournalCard: View {
                     coverPlaceholder
                 }
             }
-            .frame(width: 40, height: 40)
+            .frame(width: 32, height: 32)
             .clipShape(Circle())
 
-            // Info
+            // Info — reduced emphasis vs person name
             VStack(alignment: .leading, spacing: 2) {
                 Text(journal.title)
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundColor(textColors.primary)
+                    .font(.system(size: 15, weight: .regular))
+                    .foregroundColor(textColors.primary.opacity(0.92))
                     .lineLimit(1)
 
                 if let status = statusText {
                     Text(status)
-                        .font(.system(size: 12))
+                        .font(.system(size: 11))
                         .foregroundColor(textColors.secondary)
                         .lineLimit(1)
                 }
@@ -449,27 +468,27 @@ struct CompactJournalCard: View {
             Spacer()
 
             Image(systemName: "chevron.right")
-                .font(.system(size: 11, weight: .semibold))
+                .font(.system(size: 10, weight: .medium))
                 .foregroundColor(textColors.tertiary)
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, 6)
         .padding(.horizontal, 4)
         .contentShape(Rectangle())
     }
 
-    // Journal icon - circular to match edit sheet
+    // Journal icon — smaller circle placeholder
     private var coverPlaceholder: some View {
         ZStack {
             Circle()
                 .fill(colorScheme == .dark
-                    ? Color.white.opacity(0.08)
-                    : Color.black.opacity(0.06))
+                    ? Color.white.opacity(0.07)
+                    : Color.black.opacity(0.05))
 
             Image(systemName: "book.closed.fill")
-                .font(.system(size: 16, weight: .medium))
+                .font(.system(size: 13, weight: .medium))
                 .foregroundColor(colorScheme == .dark
-                    ? .white.opacity(0.35)
-                    : .black.opacity(0.55))
+                    ? .white.opacity(0.3)
+                    : .black.opacity(0.4))
         }
     }
 }
