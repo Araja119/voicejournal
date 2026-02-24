@@ -606,8 +606,8 @@ class ActivityViewModel: ObservableObject {
         if let name = longestWaitingPersonName {
             sentences.append("You haven't heard from \(name) in a while.")
         }
-        if let journal = cardOne?.journalTitle {
-            sentences.append("\"\(journal)\" is still waiting.")
+        if let name = cardOne?.personName {
+            sentences.append("\(name)'s story is waiting to be told.")
         }
 
         // Emotional truths (sprinkled in - rare)
@@ -615,7 +615,7 @@ class ActivityViewModel: ObservableObject {
         sentences.append("Some stories only they can tell.")
 
         // Action bias (very rare)
-        sentences.append("Today is a good day to ask.")
+        sentences.append("One question today could spark a lasting memory.")
 
         // If no data, use emotional/action only
         if sentences.count < 3 {
@@ -744,11 +744,12 @@ class ActivityViewModel: ObservableObject {
     }
 
     private func hasDataChanged(newItems: [InProgressItem]) -> Bool {
-        // Check if the primary card person changed
+        // Check if the primary card person or their data changed
         if let currentFirst = loadedCardOne,
            let newFirst = newItems.first {
             return currentFirst.personId != newFirst.personId ||
-                   currentFirst.unansweredCount != newFirst.unansweredCount
+                   currentFirst.unansweredCount != newFirst.unansweredCount ||
+                   currentFirst.personPhotoUrl != newFirst.personPhotoUrl
         }
         return true
     }
