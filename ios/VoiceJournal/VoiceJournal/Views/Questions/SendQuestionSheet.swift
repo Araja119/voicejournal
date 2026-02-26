@@ -424,13 +424,17 @@ struct SendQuestionSheet: View {
 
                     if let recordingLink = link {
                         let senderName = journal.owner.displayName
-                        let shareText = "\(senderName) has a question for you:\n\n\"\(questionText)\"\n\nTap to record your answer:\n\(recordingLink)"
+                        let messageText = "\(senderName) has a question for you:\n\n\"\(questionText)\"\n\nTap the link to record your answer:"
                         let assignmentId = assignment.id
 
                         await MainActor.run {
                             pendingShareAssignmentId = assignmentId
                             isSending = false
-                            SharePresenter.present(items: [shareText]) { completed in
+                            var shareItems: [Any] = [messageText]
+                            if let url = URL(string: recordingLink) {
+                                shareItems.append(url)
+                            }
+                            SharePresenter.present(items: shareItems) { completed in
                                 handleShareCompletion(completed: completed)
                             }
                         }

@@ -164,6 +164,7 @@ struct HubView: View {
             Text(activityViewModel.carouselText(at: currentCarouselIndex))
                 .font(.system(size: 16, weight: .medium))
                 .foregroundColor(textColors.secondary)
+                .frame(height: 44, alignment: .top)
                 .padding(.top, Theme.Spacing.xxs)
                 .id(currentCarouselIndex)
                 .transition(.opacity.animation(.easeInOut(duration: 1.8)))
@@ -727,7 +728,13 @@ class ActivityViewModel: ObservableObject {
             // Update counts
             peopleOwingStoriesCount = items.count
             totalUnansweredCount = totalUnanswered
-            longestWaitingPersonName = items.first?.personName
+            // Only show "haven't heard from X" after 48 hours of no response
+            if let oldest = items.first?.oldestUnansweredDate,
+               oldest < Date().addingTimeInterval(-48 * 3600) {
+                longestWaitingPersonName = items.first?.personName
+            } else {
+                longestWaitingPersonName = nil
+            }
 
             // Only update cards if we haven't loaded yet OR if data meaningfully changed
             if loadedCardOne == nil || hasDataChanged(newItems: items) {

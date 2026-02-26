@@ -72,7 +72,7 @@ export async function getRecordingPageData(linkToken: string): Promise<Recording
     assignment_id: assignment.id,
     question_text: assignment.question.questionText,
     person_name: assignment.person.name,
-    requester_name: assignment.question.journal.owner.displayName,
+    requester_name: assignment.question.journal.owner.displayName || 'Someone',
     journal_title: assignment.question.journal.title,
     status: assignment.status,
     already_answered: assignment.status === 'answered' || assignment.recordings.length > 0,

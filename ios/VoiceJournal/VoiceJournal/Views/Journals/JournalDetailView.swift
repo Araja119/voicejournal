@@ -81,27 +81,7 @@ struct JournalDetailView: View {
             if viewModel.isLoading {
                 LoadingView()
             } else if let journal = viewModel.journal {
-                ScrollView {
-                    VStack(spacing: Theme.Spacing.lg) {
-                        // Hero Header
-                        heroHeader(journal: journal, colors: colors)
-
-                        // Progress Status
-                        progressStatus(journal: journal, colors: colors)
-
-                        // Content Section
-                        if let questions = journal.questions, !questions.isEmpty {
-                            // Timeline with questions
-                            journalTimeline(questions: questions, journal: journal, colors: colors)
-                        } else {
-                            // Empty state with suggested question
-                            emptyJournalState(journal: journal, colors: colors)
-                        }
-                    }
-                    .padding(.horizontal, Theme.Spacing.lg)
-                    .padding(.top, Theme.Spacing.md)
-                    .padding(.bottom, Theme.Spacing.xxl)
-                }
+                journalContent(journal: journal, colors: colors)
             }
         }
         .navigationTitle("")
@@ -500,13 +480,17 @@ struct JournalDetailView: View {
 
                 // Step 3: Build share text and present share sheet
                 let senderName = journal.owner.displayName
-                let shareText = "\(senderName) has a question for you:\n\n\"\(question.questionText)\"\n\nTap to record your answer:\n\(recordingLink)"
+                let messageText = "\(senderName) has a question for you:\n\n\"\(question.questionText)\"\n\nTap the link to record your answer:"
                 let assignmentId = assignment.id
 
                 await MainActor.run {
                     pendingShareAssignmentId = assignmentId
                     sendingQuestionId = nil
-                    SharePresenter.present(items: [shareText]) { completed in
+                    var shareItems: [Any] = [messageText]
+                    if let url = URL(string: recordingLink) {
+                        shareItems.append(url)
+                    }
+                    SharePresenter.present(items: shareItems) { completed in
                         handleShareCompletion(completed: completed)
                     }
                 }
@@ -533,10 +517,14 @@ struct JournalDetailView: View {
             }
 
             let senderName = journal.owner.displayName
-            let shareText = "\(senderName) has a question for you:\n\n\"\(question.questionText)\"\n\nTap to record your answer:\n\(recordingLink)"
+            let messageText = "\(senderName) has a question for you:\n\n\"\(question.questionText)\"\n\nTap the link to record your answer:"
 
             pendingShareAssignmentId = assignment.id
-            SharePresenter.present(items: [shareText]) { completed in
+            var shareItems: [Any] = [messageText]
+            if let url = URL(string: recordingLink) {
+                shareItems.append(url)
+            }
+            SharePresenter.present(items: shareItems) { completed in
                 handleShareCompletion(completed: completed)
             }
         }
@@ -650,114 +638,159 @@ struct JournalDetailView: View {
         currentSuggestedQuestion = questions[currentSuggestionIndex]
     }
 
+    // MARK: - Journal Content (extracted for type-checker)
+    @ViewBuilder
+    private func journalContent(journal: Journal, colors: AppColors) -> some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                heroHeader(journal: journal, colors: colors)
+                    .padding(.bottom, 28)
+
+                if let questions = journal.questions, !questions.isEmpty {
+                    journalTimeline(questions: questions, journal: journal, colors: colors)
+                } else {
+                    emptyJournalState(journal: journal, colors: colors)
+                }
+            }
+            .padding(.horizontal, Theme.Spacing.lg)
+            .padding(.top, Theme.Spacing.md)
+            .padding(.bottom, Theme.Spacing.xxl)
+        }
+    }
+
     // MARK: - Hero Header
     @ViewBuilder
     private func heroHeader(journal: Journal, colors: AppColors) -> some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-            // Person avatar if dedicated
+        let recipientName = journal.dedicatedToPerson?.name
+
+        VStack(spacing: 0) {
             if let person = journal.dedicatedToPerson {
-                // Check if this is a self-journal (relationship "self" or linked to owner)
                 let isMyJournal = person.isSelf || (journal.isOwner && person.linkedUserId == journal.owner.id)
 
-                HStack(spacing: Theme.Spacing.sm) {
-                    AvatarView(
-                        name: person.name,
-                        imageURL: person.profilePhotoUrl,
-                        size: 40,
-                        colors: colors
+                AvatarView(
+                    name: person.name,
+                    imageURL: person.profilePhotoUrl,
+                    size: 80,
+                    colors: colors
+                )
+                .overlay(
+                    Circle()
+                        .stroke(
+                            colorScheme == .dark
+                                ? Color.white.opacity(0.18)
+                                : Color.white.opacity(0.9),
+                            lineWidth: 2
+                        )
+                )
+                .shadow(
+                    color: .black.opacity(colorScheme == .dark ? 0.4 : 0.12),
+                    radius: 14,
+                    x: 0,
+                    y: 5
+                )
+                .padding(.bottom, 10)
+
+                // Person name — quiet subtitle
+                Text(isMyJournal ? "My Journal" : person.name)
+                    .font(.system(size: 15, weight: .regular))
+                    .tracking(-0.1)
+                    .foregroundColor(
+                        colorScheme == .dark
+                            ? .white.opacity(0.7)
+                            : Color(red: 0.36, green: 0.40, blue: 0.46)
                     )
-                    if isMyJournal {
-                        Text("My Journal")
-                            .font(AppTypography.labelMedium)
-                            .foregroundColor(colorScheme == .dark ? .white : .black.opacity(0.85))
-                    } else {
-                        Text("For \(person.name)")
-                            .font(AppTypography.labelMedium)
-                            .foregroundColor(colorScheme == .dark ? .white : .black.opacity(0.85))
-                    }
-                }
+                    .padding(.bottom, 3)
             }
 
+            // Journal title
             Text(journal.title)
-                .font(AppTypography.headlineLarge)
-                .foregroundColor(colorScheme == .dark ? .white : .black.opacity(0.85))
+                .font(.system(size: 32, weight: .semibold))
+                .tracking(-0.5)
+                .foregroundColor(
+                    colorScheme == .dark
+                        ? .white
+                        : Color(red: 0.067, green: 0.067, blue: 0.067)
+                )
+                .shadow(
+                    color: .black.opacity(colorScheme == .dark ? 0.2 : 0.06),
+                    radius: 8,
+                    x: 0,
+                    y: 2
+                )
+                .multilineTextAlignment(.center)
                 .lineLimit(2)
 
+            // Description
             if let description = journal.description, !description.isEmpty {
                 Text(description)
                     .font(AppTypography.bodyMedium)
-                    .foregroundColor(colorScheme == .dark ? .white.opacity(0.6) : .black.opacity(0.5))
+                    .foregroundColor(colorScheme == .dark ? .white.opacity(0.50) : .black.opacity(0.40))
                     .italic()
+                    .multilineTextAlignment(.center)
                     .lineLimit(2)
+                    .padding(.top, 4)
             }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(Theme.Spacing.lg)
-        .background(
-            ZStack {
-                RoundedRectangle(cornerRadius: Theme.Radius.lg)
-                    .fill(.regularMaterial)
-                RoundedRectangle(cornerRadius: Theme.Radius.lg)
-                    .fill(colorScheme == .dark ? Color.black.opacity(0.25) : Color.white.opacity(0.4))
-            }
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.Radius.lg)
-                .stroke(colorScheme == .dark ? Color.white.opacity(0.1) : Color.black.opacity(0.06), lineWidth: 1)
-        )
-    }
 
-    // MARK: - Progress Status
-    @ViewBuilder
-    private func progressStatus(journal: Journal, colors: AppColors) -> some View {
-        let recipientName = journal.dedicatedToPerson?.name
-
-        HStack(spacing: Theme.Spacing.sm) {
-            // Questions status
-            progressChip(
-                icon: "paperplane",
-                text: journal.questionCount == 0
-                    ? "No questions yet"
-                    : "\(journal.questionCount) question\(journal.questionCount == 1 ? "" : "s") sent",
-                isActive: journal.questionCount > 0,
-                colors: colors
-            )
-
-            // Responses status - personalized when possible
-            if journal.questionCount > 0 {
-                let awaitingText: String = {
-                    if let name = recipientName {
-                        return "Waiting for \(name)"
-                    }
-                    return "Waiting for replies"
-                }()
-
+            // Status chips
+            HStack(spacing: 10) {
                 progressChip(
-                    icon: "waveform",
-                    text: journal.answeredCount == 0
-                        ? awaitingText
-                        : "\(journal.answeredCount) recorded",
-                    isActive: journal.answeredCount > 0,
-                    colors: colors
+                    icon: "paperplane",
+                    text: journal.questionCount == 0
+                        ? "No questions yet"
+                        : "\(journal.questionCount) question\(journal.questionCount == 1 ? "" : "s") sent",
+                    isActive: journal.questionCount > 0
                 )
+
+                if journal.questionCount > 0 {
+                    let awaitingText: String = {
+                        if let name = recipientName {
+                            return "Waiting for \(name)"
+                        }
+                        return "Waiting for replies"
+                    }()
+
+                    progressChip(
+                        icon: "waveform",
+                        text: journal.answeredCount == 0
+                            ? awaitingText
+                            : "\(journal.answeredCount) recorded",
+                        isActive: journal.answeredCount > 0
+                    )
+                }
             }
+            .padding(.top, 12)
         }
+        .padding(.top, 14)
+        .padding(.bottom, 14)
+        .padding(.horizontal, 24)
+        .frame(maxWidth: .infinity)
+        .glassCard(cornerRadius: 28)
     }
 
     @ViewBuilder
-    private func progressChip(icon: String, text: String, isActive: Bool, colors: AppColors) -> some View {
-        HStack(spacing: Theme.Spacing.xs) {
+    private func progressChip(icon: String, text: String, isActive: Bool) -> some View {
+        HStack(spacing: 4) {
             Image(systemName: icon)
-                .font(.system(size: 12))
+                .font(.system(size: 11))
             Text(text)
-                .font(AppTypography.caption)
+                .font(.system(size: 12, weight: .medium))
         }
-        .foregroundColor(isActive ? colors.accentPrimary : colors.textSecondary)
-        .padding(.horizontal, Theme.Spacing.sm)
-        .padding(.vertical, Theme.Spacing.xs)
+        .foregroundColor(
+            isActive
+                ? Color(red: 1.0, green: 0.48, blue: 0.27)
+                : (colorScheme == .dark
+                    ? .white.opacity(0.55)
+                    : Color(red: 0.42, green: 0.44, blue: 0.50))
+        )
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
         .background(
             Capsule()
-                .fill(isActive ? colors.accentPrimary.opacity(0.15) : colors.surface)
+                .fill(
+                    colorScheme == .dark
+                        ? Color.white.opacity(0.07)
+                        : Color.black.opacity(0.04)
+                )
         )
     }
 
@@ -958,9 +991,10 @@ struct JournalDetailView: View {
 
         VStack(alignment: .leading, spacing: 0) {
             Text("Journal Timeline")
-                .font(AppTypography.headlineSmall)
-                .foregroundColor(colorScheme == .dark ? .white : .black.opacity(0.85))
-                .padding(.bottom, Theme.Spacing.md)
+                .font(.system(size: 20, weight: .semibold))
+                .tracking(0.4)
+                .foregroundColor(colorScheme == .dark ? .white.opacity(0.9) : .black.opacity(0.8))
+                .padding(.bottom, 16)
 
             ForEach(Array(questions.enumerated()), id: \.element.id) { index, question in
                 let questionState = questionStates[index]
@@ -1183,54 +1217,13 @@ struct QuestionTimelineCard: View {
         }
         .padding(Theme.Spacing.md)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            ZStack {
-                // Backdrop blur
-                RoundedRectangle(cornerRadius: Theme.Radius.md)
-                    .fill(.ultraThinMaterial)
-                // Overlay
-                RoundedRectangle(cornerRadius: Theme.Radius.md)
-                    .fill(cardBackground)
-            }
-        )
-        .cornerRadius(Theme.Radius.md)
+        .glassCard(cornerRadius: Theme.Radius.md)
         .overlay(
-            RoundedRectangle(cornerRadius: Theme.Radius.md)
-                .stroke(borderColor, lineWidth: 1)
+            state == .answered
+                ? RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
+                    .stroke(colors.accentPrimary.opacity(colorScheme == .dark ? 0.25 : 0.3), lineWidth: 1)
+                : nil
         )
-    }
-
-    // MARK: - State-Based Background - color scheme aware
-    private var cardBackground: Color {
-        if colorScheme == .dark {
-            let baseColor = Color(red: 24/255, green: 26/255, blue: 32/255)
-            switch state {
-            case .draft:
-                return baseColor.opacity(0.72)
-            case .awaiting:
-                return baseColor.opacity(0.68)
-            case .answered:
-                return baseColor.opacity(0.75)
-            }
-        } else {
-            // Light mode: use white with varying opacity
-            switch state {
-            case .draft:
-                return Color.white.opacity(0.6)
-            case .awaiting:
-                return Color.white.opacity(0.55)
-            case .answered:
-                return Color.white.opacity(0.7)
-            }
-        }
-    }
-
-    private var borderColor: Color {
-        if colorScheme == .dark {
-            return state == .answered ? colors.accentPrimary.opacity(0.25) : Color.white.opacity(0.05)
-        } else {
-            return state == .answered ? colors.accentPrimary.opacity(0.3) : Color.black.opacity(0.06)
-        }
     }
 
     // MARK: - Draft State Content

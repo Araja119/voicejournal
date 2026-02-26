@@ -48,21 +48,37 @@ struct PeopleListView: View {
 
                             // Empty state for no other people
                             if viewModel.people.isEmpty {
-                                VStack(spacing: Theme.Spacing.md) {
-                                    Text("No family or friends added yet")
-                                        .font(AppTypography.bodyMedium)
-                                        .foregroundColor(colorScheme == .dark ? .white.opacity(0.6) : .black.opacity(0.5))
+                                VStack(spacing: Theme.Spacing.lg) {
+                                    GlassIconCircle(icon: "person.2", iconColor: GlassIconColors.slate)
+
+                                    VStack(spacing: Theme.Spacing.sm) {
+                                        Text("No family or friends added yet")
+                                            .font(AppTypography.headlineSmall)
+                                            .foregroundColor(GlassTextColors(colorScheme: colorScheme).primary)
+
+                                        Text("Add someone to start sending questions")
+                                            .font(AppTypography.bodySmall)
+                                            .foregroundColor(GlassTextColors(colorScheme: colorScheme).secondary)
+                                            .multilineTextAlignment(.center)
+                                    }
 
                                     Button(action: { showingAddPerson = true }) {
-                                        HStack {
+                                        HStack(spacing: 6) {
                                             Image(systemName: "plus")
                                             Text("Add Person")
                                         }
                                         .font(AppTypography.labelMedium)
-                                        .foregroundColor(colors.accentPrimary)
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 24)
+                                        .padding(.vertical, 12)
+                                        .background(colors.accentPrimary)
+                                        .cornerRadius(Theme.Radius.full)
                                     }
                                 }
-                                .padding(.top, Theme.Spacing.xl)
+                                .padding(Theme.Spacing.lg)
+                                .frame(maxWidth: .infinity)
+                                .glassCard(cornerRadius: 22)
+                                .padding(.top, Theme.Spacing.md)
                             }
                         }
                         .padding(.horizontal, Theme.Spacing.lg)
