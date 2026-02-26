@@ -53,10 +53,11 @@ iOS app + Node.js backend for preserving family stories through voice recordings
 - [ ] **Deploy Apple Sign-In to Railway** — Code complete on backend + iOS, needs: deploy migration, test on physical device, re-archive TestFlight build
 - [ ] **Push notifications** — Backend push token endpoint exists, iOS Firebase FCM not implemented
 - [ ] **Search** — No search in journals, people, or recordings lists
+- [ ] **Voice note transcription** — Built-in transcription so users can read what a person said in their recording (Whisper API or similar)
+- [ ] **Playback speed control** — Let users adjust playback speed (0.5x, 1x, 1.5x, 2x) when listening to recordings
 
 ### Later
 - [ ] Add `ANTHROPIC_API_KEY` to Railway (for AI-suggested questions)
-- [ ] Transcription via Whisper API
 - [ ] SMS delivery (Twilio)
 - [ ] Custom Resend email domain (currently test domain, can only send to verified addresses)
 - [ ] Video recording (premium feature idea)
