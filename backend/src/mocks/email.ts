@@ -1,3 +1,5 @@
+import { getAppUrl } from '../utils/url.js';
+
 export interface EmailMessage {
   to: string;
   subject: string;
@@ -26,7 +28,7 @@ export async function sendPasswordResetEmail(
   resetToken: string,
   displayName: string
 ): Promise<{ success: boolean; messageId: string }> {
-  const resetUrl = `${process.env.WEB_APP_URL}/reset-password?token=${resetToken}`;
+  const resetUrl = `${getAppUrl()}/reset-password?token=${resetToken}`;
 
   return sendEmail({
     to: email,
@@ -75,7 +77,7 @@ export async function sendRecordingReceivedEmail(
   personName: string,
   questionText: string
 ): Promise<{ success: boolean; messageId: string }> {
-  const appUrl = process.env.WEB_APP_URL || 'http://localhost:3000';
+  const appUrl = getAppUrl();
 
   return sendEmail({
     to: email,

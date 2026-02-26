@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import prisma from '../utils/prisma.js';
 import { NotFoundError, ForbiddenError, ValidationError } from '../utils/errors.js';
+import { getAppUrl } from '../utils/url.js';
 import type {
   CreateQuestionInput,
   BulkCreateQuestionsInput,
@@ -76,7 +77,7 @@ export async function createQuestion(
   });
 
   // Create assignments if person IDs provided
-  const appUrl = process.env.WEB_APP_URL || 'http://localhost:3000';
+  const appUrl = getAppUrl();
   const assignments: Array<{ id: string; person_id: string; status: string; unique_link_token: string; recording_link: string }> = [];
 
   if (input.assign_to_person_ids && input.assign_to_person_ids.length > 0) {
@@ -164,7 +165,7 @@ export async function updateQuestion(
     include: { assignments: true },
   });
 
-  const appUrl = process.env.WEB_APP_URL || 'http://localhost:3000';
+  const appUrl = getAppUrl();
   return {
     id: updated.id,
     question_text: updated.questionText,
@@ -248,7 +249,7 @@ export async function assignQuestion(
     throw new ForbiddenError('You do not have access to this question');
   }
 
-  const appUrl = process.env.WEB_APP_URL || 'http://localhost:3000';
+  const appUrl = getAppUrl();
   const assignments: AssignmentWithLink[] = [];
 
   for (const personId of input.person_ids) {

@@ -67,6 +67,8 @@ class AppState: ObservableObject {
                     let user = try await AuthService.shared.getCurrentUser()
                     self.currentUser = user
                     self.isAuthenticated = true
+                    // Re-register push token for returning users
+                    NotificationManager.shared.registerTokenWithBackend()
                 } catch {
                     // Token invalid, clear and go to login
                     await authManager.clearTokens()
@@ -88,6 +90,7 @@ class AppState: ObservableObject {
         await authManager.storeTokens(access: response.accessToken, refresh: response.refreshToken)
         self.currentUser = response.user
         self.isAuthenticated = true
+        await requestPushPermission()
     }
 
     func signup(email: String, password: String, displayName: String) async throws {
@@ -99,6 +102,7 @@ class AppState: ObservableObject {
         await authManager.storeTokens(access: response.accessToken, refresh: response.refreshToken)
         self.currentUser = response.user
         self.isAuthenticated = true
+        await requestPushPermission()
     }
 
     func signInWithApple(identityToken: String, authorizationCode: String,
@@ -116,6 +120,7 @@ class AppState: ObservableObject {
         self.isAuthenticated = true
         // Store Apple user ID for credential revocation checks
         UserDefaults.standard.set(appleUserId, forKey: "appleUserId")
+        await requestPushPermission()
     }
 
     func logout() async {
@@ -148,6 +153,14 @@ class AppState: ObservableObject {
     func completeTutorial() {
         hasSeenTutorial = true
         UserDefaults.standard.set(true, forKey: "hasSeenTutorial")
+    }
+
+    // MARK: - Push Notifications
+    private func requestPushPermission() async {
+        let granted = await NotificationManager.shared.requestPermission()
+        if granted {
+            print("[Push] Permission granted")
+        }
     }
 
     // MARK: - Theme

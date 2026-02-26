@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import prisma from '../utils/prisma.js';
 import { NotFoundError, ForbiddenError, ValidationError } from '../utils/errors.js';
 import { uploadAudio, getSignedUrl } from './storage.js';
-import { notifyRecordingReceived } from '../mocks/push.js';
+import { notifyRecordingReceived } from './push.service.js';
 import { sendRecordingReceivedEmail } from './email.js';
 import { getUserPushTokens } from './users.service.js';
 import type { RecordingsQueryInput } from '../validators/recordings.validators.js';

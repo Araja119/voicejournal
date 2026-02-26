@@ -1,5 +1,6 @@
 import prisma from '../utils/prisma.js';
 import { NotFoundError, ForbiddenError, ValidationError } from '../utils/errors.js';
+import { getAppUrl } from '../utils/url.js';
 import { sendQuestionLink, sendReminder as sendSmsReminder } from '../mocks/sms.js';
 import { sendQuestionLinkEmail } from './email.js';
 import type { SendAssignmentInput } from '../validators/questions.validators.js';
@@ -34,7 +35,7 @@ export async function sendAssignment(
   const person = assignment.person;
   const owner = assignment.question.journal.owner;
   const questionText = assignment.question.questionText;
-  const appUrl = process.env.WEB_APP_URL || 'http://localhost:3000';
+  const appUrl = getAppUrl();
   const recordingUrl = `${appUrl}/record/${assignment.uniqueLinkToken}`;
 
   if (input.channel === 'share') {
@@ -148,7 +149,7 @@ export async function sendReminder(
   const person = assignment.person;
   const owner = assignment.question.journal.owner;
   const questionText = assignment.question.questionText;
-  const appUrl = process.env.WEB_APP_URL || 'http://localhost:3000';
+  const appUrl = getAppUrl();
   const recordingUrl = `${appUrl}/record/${assignment.uniqueLinkToken}`;
 
   if (input.channel === 'share') {

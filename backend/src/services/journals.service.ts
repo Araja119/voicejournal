@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import prisma from '../utils/prisma.js';
 import { NotFoundError, ForbiddenError } from '../utils/errors.js';
+import { getAppUrl } from '../utils/url.js';
 import { uploadJournalCover, getSignedUrl } from './storage.js';
 
 async function signPhotoUrl(url: string | null): Promise<string | null> {
@@ -162,7 +163,7 @@ export async function listJournals(userId: string, query: JournalQueryInput): Pr
 
 export async function createJournal(userId: string, input: CreateJournalInput): Promise<JournalDetail> {
   const shareCode = generateShareCode();
-  const appUrl = process.env.WEB_APP_URL || 'http://localhost:3000';
+  const appUrl = getAppUrl();
 
   const journal = await prisma.journal.create({
     data: {
@@ -243,7 +244,7 @@ export async function getJournal(userId: string, journalId: string): Promise<Jou
     throw new ForbiddenError('You do not have access to this journal');
   }
 
-  const appUrl = process.env.WEB_APP_URL || 'http://localhost:3000';
+  const appUrl = getAppUrl();
 
   // Get unique people (with signed photo URLs)
   const peopleMap = new Map<string, { id: string; name: string; relationship: string; profile_photo_url: string | null }>();

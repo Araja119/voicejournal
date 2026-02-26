@@ -7,9 +7,38 @@
 
 import SwiftUI
 import AuthenticationServices
+import FirebaseCore
+import FirebaseMessaging
+
+// MARK: - App Delegate (for push notifications)
+class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(
+        _ application: UIApplication,
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
+    ) -> Bool {
+        FirebaseApp.configure()
+        NotificationManager.shared.configure()
+        return true
+    }
+
+    func application(
+        _ application: UIApplication,
+        didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+    ) {
+        NotificationManager.shared.handleAPNsToken(deviceToken)
+    }
+
+    func application(
+        _ application: UIApplication,
+        didFailToRegisterForRemoteNotificationsWithError error: Error
+    ) {
+        print("[Push] Failed to register for remote notifications: \(error)")
+    }
+}
 
 @main
 struct VoiceJournalApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
     @StateObject private var appState = AppState()
 
     var body: some Scene {

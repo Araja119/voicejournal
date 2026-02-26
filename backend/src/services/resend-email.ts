@@ -1,4 +1,5 @@
 import { Resend } from 'resend';
+import { getAppUrl } from '../utils/url.js';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const FROM_EMAIL = process.env.EMAIL_FROM || 'VoiceJournal <noreply@voicejournal.app>';
@@ -37,7 +38,7 @@ export async function sendPasswordResetEmail(
   resetToken: string,
   displayName: string
 ): Promise<{ success: boolean; messageId: string }> {
-  const resetUrl = `${process.env.WEB_APP_URL}/reset-password?token=${resetToken}`;
+  const resetUrl = `${getAppUrl()}/reset-password?token=${resetToken}`;
 
   return sendEmail({
     to: email,
@@ -86,7 +87,7 @@ export async function sendRecordingReceivedEmail(
   personName: string,
   questionText: string
 ): Promise<{ success: boolean; messageId: string }> {
-  const appUrl = process.env.WEB_APP_URL || 'http://localhost:3000';
+  const appUrl = getAppUrl();
 
   return sendEmail({
     to: email,
