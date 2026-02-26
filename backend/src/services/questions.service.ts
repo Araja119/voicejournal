@@ -22,6 +22,8 @@ export interface QuestionWithAssignments {
     id: string;
     person_id: string;
     status: string;
+    unique_link_token: string;
+    recording_link: string;
   }>;
 }
 
@@ -74,7 +76,8 @@ export async function createQuestion(
   });
 
   // Create assignments if person IDs provided
-  const assignments: Array<{ id: string; person_id: string; status: string }> = [];
+  const appUrl = process.env.WEB_APP_URL || 'http://localhost:3000';
+  const assignments: Array<{ id: string; person_id: string; status: string; unique_link_token: string; recording_link: string }> = [];
 
   if (input.assign_to_person_ids && input.assign_to_person_ids.length > 0) {
     for (const personId of input.assign_to_person_ids) {
@@ -99,6 +102,8 @@ export async function createQuestion(
         id: assignment.id,
         person_id: assignment.personId,
         status: assignment.status,
+        unique_link_token: assignment.uniqueLinkToken,
+        recording_link: `${appUrl}/record/${assignment.uniqueLinkToken}`,
       });
     }
   }
@@ -159,6 +164,7 @@ export async function updateQuestion(
     include: { assignments: true },
   });
 
+  const appUrl = process.env.WEB_APP_URL || 'http://localhost:3000';
   return {
     id: updated.id,
     question_text: updated.questionText,
@@ -168,6 +174,8 @@ export async function updateQuestion(
       id: a.id,
       person_id: a.personId,
       status: a.status,
+      unique_link_token: a.uniqueLinkToken,
+      recording_link: `${appUrl}/record/${a.uniqueLinkToken}`,
     })),
   };
 }
