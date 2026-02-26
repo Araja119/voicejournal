@@ -235,7 +235,7 @@ export async function listRecordings(
       person: {
         id: r.assignment.person.id,
         name: r.assignment.person.name,
-        profile_photo_url: r.assignment.person.profilePhotoUrl,
+        profile_photo_url: r.assignment.person.profilePhotoUrl ? await getSignedUrl(r.assignment.person.profilePhotoUrl) : null,
       },
       journal: {
         id: r.assignment.question.journal.id,
@@ -284,7 +284,7 @@ export async function getRecording(userId: string, recordingId: string): Promise
     person: {
       id: recording.assignment.person.id,
       name: recording.assignment.person.name,
-      profile_photo_url: recording.assignment.person.profilePhotoUrl,
+      profile_photo_url: recording.assignment.person.profilePhotoUrl ? await getSignedUrl(recording.assignment.person.profilePhotoUrl) : null,
     },
     journal: {
       id: recording.assignment.question.journal.id,
@@ -437,7 +437,7 @@ export async function createAuthenticatedRecording(
         person: {
           id: existingRecording.assignment.person.id,
           name: existingRecording.assignment.person.name,
-          profile_photo_url: existingRecording.assignment.person.profilePhotoUrl,
+          profile_photo_url: existingRecording.assignment.person.profilePhotoUrl ? await getSignedUrl(existingRecording.assignment.person.profilePhotoUrl) : null,
         },
         journal: {
           id: existingRecording.assignment.question.journal.id,
@@ -563,7 +563,7 @@ export async function createAuthenticatedRecording(
     person: {
       id: recording.assignment.person.id,
       name: recording.assignment.person.name,
-      profile_photo_url: recording.assignment.person.profilePhotoUrl,
+      profile_photo_url: recording.assignment.person.profilePhotoUrl ? await getSignedUrl(recording.assignment.person.profilePhotoUrl) : null,
     },
     journal: {
       id: recording.assignment.question.journal.id,
