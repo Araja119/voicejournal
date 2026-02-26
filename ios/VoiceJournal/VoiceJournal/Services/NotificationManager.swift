@@ -1,7 +1,7 @@
 import Foundation
+import Combine
 import UIKit
 import UserNotifications
-import FirebaseMessaging
 
 @MainActor
 class NotificationManager: NSObject, ObservableObject {
@@ -15,9 +15,8 @@ class NotificationManager: NSObject, ObservableObject {
 
     // MARK: - Setup
 
-    /// Call once at app launch after FirebaseApp.configure()
+    /// Call once at app launch
     func configure() {
-        Messaging.messaging().delegate = self
         UNUserNotificationCenter.current().delegate = self
     }
 
@@ -59,20 +58,9 @@ class NotificationManager: NSObject, ObservableObject {
     // MARK: - APNs Token
 
     func handleAPNsToken(_ deviceToken: Data) {
-        Messaging.messaging().apnsToken = deviceToken
-    }
-}
-
-// MARK: - Firebase Messaging Delegate
-extension NotificationManager: MessagingDelegate {
-    nonisolated func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
-        guard let fcmToken else { return }
-        print("[Push] FCM token: \(fcmToken.prefix(20))...")
-
-        Task { @MainActor in
-            self.fcmToken = fcmToken
-            self.registerTokenWithBackend()
-        }
+        // TODO: Forward to Firebase Messaging when SDK is added
+        // Messaging.messaging().apnsToken = deviceToken
+        print("[Push] APNs token received")
     }
 }
 
@@ -95,11 +83,6 @@ extension NotificationManager: UNUserNotificationCenterDelegate {
     ) {
         let userInfo = response.notification.request.content.userInfo
         print("[Push] Notification tapped: \(userInfo)")
-
-        // TODO: Deep-link to specific journal/recording based on userInfo
-        // userInfo["type"] == "recording_received"
-        // userInfo["journalId"], userInfo["recordingId"]
-
         completionHandler()
     }
 }

@@ -89,6 +89,8 @@ struct WaveformBar: View {
 struct StaticWaveformView: View {
     let progress: Double
     let colors: AppColors
+    var onScrub: ((Double) -> Void)? = nil
+    var onScrubEnd: (() -> Void)? = nil
 
     private let barCount = 50
 
@@ -104,6 +106,17 @@ struct StaticWaveformView: View {
                         .frame(height: height)
                 }
             }
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        let normalized = min(max(value.location.x / geometry.size.width, 0), 1)
+                        onScrub?(normalized)
+                    }
+                    .onEnded { _ in
+                        onScrubEnd?()
+                    }
+            )
         }
     }
 

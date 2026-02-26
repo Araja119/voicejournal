@@ -6,9 +6,8 @@
 //
 
 import SwiftUI
+import UIKit
 import AuthenticationServices
-import FirebaseCore
-import FirebaseMessaging
 
 // MARK: - App Delegate (for push notifications)
 class AppDelegate: NSObject, UIApplicationDelegate {
@@ -16,7 +15,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
-        FirebaseApp.configure()
+        // TODO: FirebaseApp.configure() when SDK is added
         NotificationManager.shared.configure()
         return true
     }

@@ -480,17 +480,13 @@ struct JournalDetailView: View {
 
                 // Step 3: Build share text and present share sheet
                 let senderName = journal.owner.displayName
-                let messageText = "\(senderName) has a question for you:\n\n\"\(question.questionText)\"\n\nTap the link to record your answer:"
+                let messageText = "\(senderName) has a question for you:\n\n\"\(question.questionText)\"\n\nTap to record your answer:\n\(recordingLink)"
                 let assignmentId = assignment.id
 
                 await MainActor.run {
                     pendingShareAssignmentId = assignmentId
                     sendingQuestionId = nil
-                    var shareItems: [Any] = [messageText]
-                    if let url = URL(string: recordingLink) {
-                        shareItems.append(url)
-                    }
-                    SharePresenter.present(items: shareItems) { completed in
+                    SharePresenter.present(items: [messageText]) { completed in
                         handleShareCompletion(completed: completed)
                     }
                 }
@@ -517,14 +513,10 @@ struct JournalDetailView: View {
             }
 
             let senderName = journal.owner.displayName
-            let messageText = "\(senderName) has a question for you:\n\n\"\(question.questionText)\"\n\nTap the link to record your answer:"
+            let messageText = "\(senderName) has a question for you:\n\n\"\(question.questionText)\"\n\nTap to record your answer:\n\(recordingLink)"
 
             pendingShareAssignmentId = assignment.id
-            var shareItems: [Any] = [messageText]
-            if let url = URL(string: recordingLink) {
-                shareItems.append(url)
-            }
-            SharePresenter.present(items: shareItems) { completed in
+            SharePresenter.present(items: [messageText]) { completed in
                 handleShareCompletion(completed: completed)
             }
         }

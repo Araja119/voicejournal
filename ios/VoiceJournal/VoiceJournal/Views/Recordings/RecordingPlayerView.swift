@@ -11,13 +11,16 @@ struct RecordingPlayerView: View {
     @State private var currentTime: Double = 0
     @State private var duration: Double = 0
     @State private var isLoading = true
+    @State private var isScrubbing = false
+    @State private var wasPlayingBeforeScrub = false
+    @State private var timeObserver: Any?
+    @State private var statusObserver: NSKeyValueObservation?
 
     var body: some View {
         let colors = AppColors(colorScheme)
 
         NavigationStack {
             ZStack {
-                // Use app background for consistent aesthetic
                 AppBackground()
 
                 VStack(spacing: Theme.Spacing.xl) {
@@ -39,7 +42,7 @@ struct RecordingPlayerView: View {
                         }
                     }
 
-                    // Question - prominent white bold text
+                    // Question
                     if let question = recording.question {
                         Text("\"\(question.questionText)\"")
                             .font(.system(size: 22, weight: .semibold))
@@ -51,10 +54,32 @@ struct RecordingPlayerView: View {
 
                     Spacer()
 
-                    // Waveform visualization
+                    // Waveform visualization with scrubbing
                     StaticWaveformView(
                         progress: duration > 0 ? currentTime / duration : 0,
-                        colors: colors
+                        colors: colors,
+                        onScrub: { progress in
+                            if !isScrubbing {
+                                isScrubbing = true
+                                wasPlayingBeforeScrub = isPlaying
+                                player?.pause()
+                                isPlaying = false
+                            }
+                            let targetTime = progress * duration
+                            currentTime = targetTime
+                            player?.seek(
+                                to: CMTime(seconds: targetTime, preferredTimescale: 600),
+                                toleranceBefore: .zero,
+                                toleranceAfter: .zero
+                            )
+                        },
+                        onScrubEnd: {
+                            isScrubbing = false
+                            if wasPlayingBeforeScrub {
+                                player?.play()
+                                isPlaying = true
+                            }
+                        }
                     )
                     .frame(height: 70)
                     .padding(.horizontal, Theme.Spacing.lg)
@@ -75,9 +100,9 @@ struct RecordingPlayerView: View {
 
                     // Playback controls
                     HStack(spacing: Theme.Spacing.xxl) {
-                        // Rewind 15s
+                        // Rewind 5s
                         Button(action: rewind) {
-                            Image(systemName: "gobackward.15")
+                            Image(systemName: "gobackward.5")
                                 .font(.system(size: 32))
                                 .foregroundColor(.white.opacity(0.8))
                         }
@@ -103,9 +128,9 @@ struct RecordingPlayerView: View {
                         }
                         .disabled(isLoading)
 
-                        // Forward 15s
+                        // Forward 5s
                         Button(action: forward) {
-                            Image(systemName: "goforward.15")
+                            Image(systemName: "goforward.5")
                                 .font(.system(size: 32))
                                 .foregroundColor(.white.opacity(0.8))
                         }
@@ -160,69 +185,89 @@ struct RecordingPlayerView: View {
             await loadAudio()
         }
         .onDisappear {
-            player?.pause()
-            player = nil
+            cleanup()
         }
     }
 
     private func formatTime(_ seconds: Double) -> String {
+        guard !seconds.isNaN && !seconds.isInfinite else { return "0:00" }
         let mins = Int(seconds) / 60
         let secs = Int(seconds) % 60
         return String(format: "%d:%02d", mins, secs)
     }
 
     private func loadAudio() async {
-        print("🔊 Loading audio from URL: \(recording.audioUrl)")
-
         guard let url = URL(string: recording.audioUrl) else {
-            print("🔊 ERROR: Invalid URL!")
             isLoading = false
             return
         }
 
-        print("🔊 Created URL object: \(url)")
+        let playerItem = AVPlayerItem(url: url)
+        let avPlayer = AVPlayer(playerItem: playerItem)
+        self.player = avPlayer
 
-        await MainActor.run {
-            player = AVPlayer(url: url)
-            print("🔊 Created AVPlayer")
+        // Use API duration first (measured at recording time, always accurate).
+        // Asset metadata can be wrong for browser-recorded audio streamed from R2.
+        if let apiDuration = recording.durationSeconds, apiDuration > 0 {
+            duration = Double(apiDuration)
+        }
 
-            // Observe duration
-            player?.currentItem?.asset.loadValuesAsynchronously(forKeys: ["duration"]) {
-                Task { @MainActor in
-                    if let item = player?.currentItem {
-                        let assetDuration = item.asset.duration
-                        duration = assetDuration.seconds
-                        print("🔊 Asset duration: \(assetDuration.seconds) seconds, isValid: \(!assetDuration.seconds.isNaN)")
+        // Observe player item status for readiness
+        statusObserver = playerItem.observe(\.status, options: [.new]) { item, _ in
+            Task { @MainActor in
+                if item.status == .readyToPlay {
+                    // Only use asset duration if we don't have an API duration
+                    if recording.durationSeconds == nil || recording.durationSeconds == 0 {
+                        let assetDuration = item.duration.seconds
+                        if !assetDuration.isNaN && !assetDuration.isInfinite && assetDuration > 0 {
+                            duration = assetDuration
+                        }
                     }
+                    isLoading = false
+                } else if item.status == .failed {
                     isLoading = false
                 }
             }
+        }
 
-            // Also observe player errors
-            NotificationCenter.default.addObserver(
-                forName: .AVPlayerItemFailedToPlayToEndTime,
-                object: player?.currentItem,
-                queue: .main
-            ) { notification in
-                print("🔊 Player failed: \(notification)")
-            }
-
-            // Observe time
-            player?.addPeriodicTimeObserver(
-                forInterval: CMTime(seconds: 0.1, preferredTimescale: 600),
-                queue: .main
-            ) { time in
-                currentTime = time.seconds
-
-                // Check if finished
-                if let dur = player?.currentItem?.duration,
-                   time >= dur {
-                    isPlaying = false
-                    currentTime = 0
-                    player?.seek(to: .zero)
+        // Observe end of playback — correct duration if asset metadata was wrong
+        NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemDidPlayToEndTime,
+            object: playerItem,
+            queue: .main
+        ) { _ in
+            Task { @MainActor in
+                // If playback ended well before displayed duration, the metadata was wrong
+                if currentTime > 0 && currentTime < duration * 0.9 {
+                    duration = currentTime
                 }
+                isPlaying = false
+                currentTime = 0
+                player?.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero)
             }
         }
+
+        // Periodic time observer
+        let observer = avPlayer.addPeriodicTimeObserver(
+            forInterval: CMTime(seconds: 0.05, preferredTimescale: 600),
+            queue: .main
+        ) { time in
+            if !isScrubbing {
+                currentTime = time.seconds
+            }
+        }
+        timeObserver = observer
+    }
+
+    private func cleanup() {
+        player?.pause()
+        if let observer = timeObserver {
+            player?.removeTimeObserver(observer)
+            timeObserver = nil
+        }
+        statusObserver?.invalidate()
+        statusObserver = nil
+        player = nil
     }
 
     private func togglePlayback() {
@@ -235,13 +280,23 @@ struct RecordingPlayerView: View {
     }
 
     private func rewind() {
-        let newTime = max(0, currentTime - 15)
-        player?.seek(to: CMTime(seconds: newTime, preferredTimescale: 600))
+        let newTime = max(0, currentTime - 5)
+        currentTime = newTime
+        player?.seek(
+            to: CMTime(seconds: newTime, preferredTimescale: 600),
+            toleranceBefore: .zero,
+            toleranceAfter: .zero
+        )
     }
 
     private func forward() {
-        let newTime = min(duration, currentTime + 15)
-        player?.seek(to: CMTime(seconds: newTime, preferredTimescale: 600))
+        let newTime = min(duration, currentTime + 5)
+        currentTime = newTime
+        player?.seek(
+            to: CMTime(seconds: newTime, preferredTimescale: 600),
+            toleranceBefore: .zero,
+            toleranceAfter: .zero
+        )
     }
 }
 
