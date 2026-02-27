@@ -7,6 +7,8 @@ enum BackgroundTheme: String, CaseIterable, Identifiable {
     case classic = "classic"
     case desertSun = "desertSun"
     case antiqueParchment = "antiqueParchment"
+    case goldenBloom = "goldenBloom"
+    case whisperingGrove = "whisperingGrove"
 
     var id: String { rawValue }
 
@@ -15,6 +17,8 @@ enum BackgroundTheme: String, CaseIterable, Identifiable {
         case .classic: return "Classic"
         case .desertSun: return "Desert Sun"
         case .antiqueParchment: return "Antique Parchment"
+        case .goldenBloom: return "Golden Bloom"
+        case .whisperingGrove: return "Whispering Grove"
         }
     }
 
@@ -22,7 +26,9 @@ enum BackgroundTheme: String, CaseIterable, Identifiable {
         switch self {
         case .classic: return "Classic"
         case .desertSun: return "Calm Ocean"
-        case .antiqueParchment: return "Archive Gray"
+        case .antiqueParchment: return "Obsidian Hide"
+        case .goldenBloom: return "Midnight Bloom"
+        case .whisperingGrove: return "Emberwood Night"
         }
     }
 
@@ -35,6 +41,8 @@ enum BackgroundTheme: String, CaseIterable, Identifiable {
         case .classic: return "Background"
         case .desertSun: return "BackgroundDesertSun"
         case .antiqueParchment: return "BackgroundAntiqueParchment"
+        case .goldenBloom: return "BackgroundGoldenBloom"
+        case .whisperingGrove: return "BackgroundWhisperingGrove"
         }
     }
 }

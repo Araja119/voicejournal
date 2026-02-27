@@ -15,6 +15,9 @@ struct RecordingPlayerView: View {
     @State private var wasPlayingBeforeScrub = false
     @State private var timeObserver: Any?
     @State private var statusObserver: NSKeyValueObservation?
+    @State private var playbackSpeed: Float = 1.0
+
+    private let speedOptions: [Float] = [1.0, 1.25, 1.5, 2.0]
 
     var body: some View {
         let colors = AppColors(colorScheme)
@@ -76,7 +79,7 @@ struct RecordingPlayerView: View {
                         onScrubEnd: {
                             isScrubbing = false
                             if wasPlayingBeforeScrub {
-                                player?.play()
+                                player?.rate = playbackSpeed
                                 isPlaying = true
                             }
                         }
@@ -84,11 +87,24 @@ struct RecordingPlayerView: View {
                     .frame(height: 70)
                     .padding(.horizontal, Theme.Spacing.lg)
 
-                    // Time display
+                    // Time display + speed control
                     HStack {
                         Text(formatTime(currentTime))
                             .font(AppTypography.labelMedium)
                             .foregroundColor(.white.opacity(0.7))
+
+                        Spacer()
+
+                        // Speed pill
+                        Button(action: cycleSpeed) {
+                            Text(speedLabel)
+                                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 4)
+                                .background(Color.white.opacity(0.2))
+                                .clipShape(Capsule())
+                        }
 
                         Spacer()
 
@@ -270,11 +286,32 @@ struct RecordingPlayerView: View {
         player = nil
     }
 
+    private var speedLabel: String {
+        if playbackSpeed == 1.0 { return "1x" }
+        if playbackSpeed == 1.25 { return "1.25x" }
+        if playbackSpeed == 1.5 { return "1.5x" }
+        if playbackSpeed == 2.0 { return "2x" }
+        return "\(playbackSpeed)x"
+    }
+
+    private func cycleSpeed() {
+        guard let idx = speedOptions.firstIndex(of: playbackSpeed) else {
+            playbackSpeed = 1.0
+            player?.rate = isPlaying ? 1.0 : 0
+            return
+        }
+        let nextIdx = (idx + 1) % speedOptions.count
+        playbackSpeed = speedOptions[nextIdx]
+        if isPlaying {
+            player?.rate = playbackSpeed
+        }
+    }
+
     private func togglePlayback() {
         if isPlaying {
             player?.pause()
         } else {
-            player?.play()
+            player?.rate = playbackSpeed
         }
         isPlaying.toggle()
     }
