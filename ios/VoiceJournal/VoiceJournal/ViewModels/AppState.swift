@@ -2,6 +2,43 @@ import SwiftUI
 import Combine
 import AuthenticationServices
 
+// MARK: - Background Theme
+enum BackgroundTheme: String, CaseIterable, Identifiable {
+    case classic = "classic"
+    case desertSun = "desertSun"
+    case antiqueParchment = "antiqueParchment"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .classic: return "Classic"
+        case .desertSun: return "Desert Sun"
+        case .antiqueParchment: return "Antique Parchment"
+        }
+    }
+
+    var darkDisplayName: String {
+        switch self {
+        case .classic: return "Classic"
+        case .desertSun: return "Calm Ocean"
+        case .antiqueParchment: return "Archive Gray"
+        }
+    }
+
+    func name(for colorScheme: ColorScheme) -> String {
+        colorScheme == .dark ? darkDisplayName : displayName
+    }
+
+    var assetName: String {
+        switch self {
+        case .classic: return "Background"
+        case .desertSun: return "BackgroundDesertSun"
+        case .antiqueParchment: return "BackgroundAntiqueParchment"
+        }
+    }
+}
+
 // MARK: - App State
 @MainActor
 class AppState: ObservableObject {
@@ -12,6 +49,7 @@ class AppState: ObservableObject {
 
     // MARK: - Theme
     @Published var isDarkMode = true
+    @Published var backgroundTheme: BackgroundTheme = .classic
 
     var colorScheme: ColorScheme? {
         isDarkMode ? .dark : .light
@@ -39,6 +77,12 @@ class AppState: ObservableObject {
         isDarkMode = UserDefaults.standard.bool(forKey: "isDarkMode")
         if !UserDefaults.standard.contains(key: "isDarkMode") {
             isDarkMode = true // Default to dark mode
+        }
+
+        // Load background theme
+        if let savedTheme = UserDefaults.standard.string(forKey: "backgroundTheme"),
+           let theme = BackgroundTheme(rawValue: savedTheme) {
+            backgroundTheme = theme
         }
     }
 
@@ -167,6 +211,11 @@ class AppState: ObservableObject {
     func toggleTheme() {
         isDarkMode.toggle()
         UserDefaults.standard.set(isDarkMode, forKey: "isDarkMode")
+    }
+
+    func setBackgroundTheme(_ theme: BackgroundTheme) {
+        backgroundTheme = theme
+        UserDefaults.standard.set(theme.rawValue, forKey: "backgroundTheme")
     }
 }
 

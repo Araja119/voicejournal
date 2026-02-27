@@ -63,6 +63,31 @@ struct SettingsView: View {
                                 Text("Dark Mode")
                             }
                         }
+
+                        // Background theme carousel
+                        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                            Text("Background")
+                                .font(AppTypography.labelMedium)
+                                .foregroundColor(colors.textSecondary)
+
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: Theme.Spacing.md) {
+                                    ForEach(BackgroundTheme.allCases) { theme in
+                                        ThemeThumbnail(
+                                            theme: theme,
+                                            isSelected: appState.backgroundTheme == theme,
+                                            colors: colors
+                                        ) {
+                                            withAnimation(.easeInOut(duration: 0.3)) {
+                                                appState.setBackgroundTheme(theme)
+                                            }
+                                        }
+                                    }
+                                }
+                                .padding(.vertical, 4)
+                            }
+                        }
+                        .padding(.vertical, Theme.Spacing.xs)
                     }
                     .listRowBackground(colors.surface)
 
@@ -148,6 +173,46 @@ struct SettingsView: View {
                 Text("This cannot be undone. All your journals, questions, voice recordings, and people will be permanently deleted.")
             }
         }
+    }
+}
+
+// MARK: - Theme Thumbnail
+struct ThemeThumbnail: View {
+    let theme: BackgroundTheme
+    let isSelected: Bool
+    let colors: AppColors
+    let onTap: () -> Void
+
+    @Environment(\.colorScheme) var colorScheme
+
+    var body: some View {
+        Button(action: onTap) {
+            VStack(spacing: 6) {
+                ZStack {
+                    Image(theme.assetName)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 90, height: 130)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                    if isSelected {
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(colors.accentPrimary, lineWidth: 3)
+                            .frame(width: 90, height: 130)
+
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 22))
+                            .foregroundColor(colors.accentPrimary)
+                            .background(Circle().fill(.white).padding(2))
+                    }
+                }
+
+                Text(theme.name(for: colorScheme))
+                    .font(AppTypography.caption)
+                    .foregroundColor(isSelected ? colors.accentPrimary : colors.textSecondary)
+            }
+        }
+        .buttonStyle(.plain)
     }
 }
 

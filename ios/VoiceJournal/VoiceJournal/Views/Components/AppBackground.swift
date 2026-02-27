@@ -2,6 +2,7 @@ import SwiftUI
 
 struct AppBackground: View {
     @Environment(\.colorScheme) var colorScheme
+    @EnvironmentObject var appState: AppState
 
     // MARK: - Vignette Colors (never pure black)
 
@@ -59,7 +60,7 @@ struct AppBackground: View {
         GeometryReader { geometry in
             ZStack {
                 // Base image
-                Image("Background")
+                Image(appState.backgroundTheme.assetName)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
                     .frame(width: geometry.size.width, height: geometry.size.height)
