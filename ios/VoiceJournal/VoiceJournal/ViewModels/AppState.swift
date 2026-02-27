@@ -28,7 +28,7 @@ enum BackgroundTheme: String, CaseIterable, Identifiable {
         case .desertSun: return "Calm Ocean"
         case .antiqueParchment: return "Obsidian Hide"
         case .goldenBloom: return "Midnight Bloom"
-        case .whisperingGrove: return "Emberwood Night"
+        case .whisperingGrove: return "Enchanted Forest"
         }
     }
 
