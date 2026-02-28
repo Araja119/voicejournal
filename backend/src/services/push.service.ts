@@ -27,6 +27,7 @@ function initFirebase(): boolean {
     console.log('[Push] Private key length:', decoded.private_key?.length);
     admin.initializeApp({
       credential: admin.credential.cert(decoded),
+      projectId: decoded.project_id,
     });
     firebaseInitialized = true;
     console.log('[Push] Firebase Admin SDK initialized');
