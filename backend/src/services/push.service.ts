@@ -12,9 +12,19 @@ function initFirebase(): boolean {
   }
 
   try {
-    const decoded = JSON.parse(
-      Buffer.from(serviceAccount, 'base64').toString('utf-8')
-    );
+    let decoded: any;
+    // Try base64 first, fall back to raw JSON
+    try {
+      decoded = JSON.parse(
+        Buffer.from(serviceAccount, 'base64').toString('utf-8')
+      );
+    } catch {
+      decoded = JSON.parse(serviceAccount);
+    }
+    console.log('[Push] Service account project:', decoded.project_id);
+    console.log('[Push] Service account email:', decoded.client_email);
+    console.log('[Push] Private key present:', !!decoded.private_key);
+    console.log('[Push] Private key length:', decoded.private_key?.length);
     admin.initializeApp({
       credential: admin.credential.cert(decoded),
     });
