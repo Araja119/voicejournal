@@ -21,10 +21,6 @@ function initFirebase(): boolean {
     } catch {
       decoded = JSON.parse(serviceAccount);
     }
-    console.log('[Push] Service account project:', decoded.project_id);
-    console.log('[Push] Service account email:', decoded.client_email);
-    console.log('[Push] Private key present:', !!decoded.private_key);
-    console.log('[Push] Private key length:', decoded.private_key?.length);
     admin.initializeApp({
       credential: admin.credential.cert(decoded),
       projectId: decoded.project_id,
@@ -51,20 +47,6 @@ async function sendPush(
   if (!initFirebase()) return null;
 
   try {
-    // Test credential token exchange first
-    const appCredential = admin.app().options.credential;
-    if (appCredential) {
-      try {
-        const accessToken = await appCredential.getAccessToken();
-        console.log('[Push] Access token obtained, expires:', accessToken.expires_in);
-      } catch (tokenErr: any) {
-        console.error('[Push] Token exchange failed:', tokenErr.message || tokenErr);
-        console.error('[Push] Token error code:', tokenErr.code);
-        console.error('[Push] Token error full:', JSON.stringify(tokenErr, Object.getOwnPropertyNames(tokenErr)));
-      }
-    }
-
-    console.log('[Push] Sending to token:', token.substring(0, 20) + '...');
     const messageId = await admin.messaging().send({
       token,
       notification: { title, body },
@@ -78,12 +60,8 @@ async function sendPush(
         },
       },
     });
-    console.log('[Push] Sent successfully, messageId:', messageId);
     return messageId;
   } catch (err: any) {
-    console.error('[Push] Send failed code:', err.code);
-    console.error('[Push] Send failed message:', err.message);
-    console.error('[Push] Send failed full:', JSON.stringify(err, Object.getOwnPropertyNames(err)));
     // Clean up invalid tokens
     if (
       err.code === 'messaging/invalid-registration-token' ||
@@ -91,6 +69,8 @@ async function sendPush(
     ) {
       console.log(`[Push] Removing invalid token: ${token.substring(0, 20)}...`);
       await prisma.pushToken.deleteMany({ where: { token } });
+    } else {
+      console.error(`[Push] Send failed:`, err.message || err);
     }
     return null;
   }

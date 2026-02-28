@@ -2,6 +2,7 @@ import Foundation
 import Combine
 import UIKit
 import UserNotifications
+import FirebaseMessaging
 
 @MainActor
 class NotificationManager: NSObject, ObservableObject {
@@ -18,6 +19,7 @@ class NotificationManager: NSObject, ObservableObject {
     /// Call once at app launch
     func configure() {
         UNUserNotificationCenter.current().delegate = self
+        Messaging.messaging().delegate = self
     }
 
     // MARK: - Permission
@@ -58,9 +60,20 @@ class NotificationManager: NSObject, ObservableObject {
     // MARK: - APNs Token
 
     func handleAPNsToken(_ deviceToken: Data) {
-        // TODO: Forward to Firebase Messaging when SDK is added
-        // Messaging.messaging().apnsToken = deviceToken
+        Messaging.messaging().apnsToken = deviceToken
         print("[Push] APNs token received")
+    }
+}
+
+// MARK: - Firebase Messaging Delegate
+extension NotificationManager: MessagingDelegate {
+    nonisolated func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
+        guard let token = fcmToken else { return }
+        print("[Push] FCM token: \(token)")
+        Task { @MainActor in
+            self.fcmToken = token
+            self.registerTokenWithBackend()
+        }
     }
 }
 
